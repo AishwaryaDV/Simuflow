@@ -1,16 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import WorkspaceLayout from './components/layout/WorkspaceLayout'
 
-// Placeholder pages — replaced in Phase 1 and Phase 5
-const WorkspacePage = () => <div>Workspace — coming in Phase 1</div>
-const SharedViewPage = () => <div>Shared view — coming in Phase 5</div>
+const SharedViewPage = () => <div className="p-8 text-gray-500">Shared view — coming in Phase 5</div>
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"             element={<WorkspacePage />} />
-        <Route path="/view/:token"  element={<SharedViewPage />} />
-        <Route path="*"             element={<Navigate to="/" replace />} />
+        <Route path="/" element={<WorkspaceLayout />} />
+        <Route path="/view/:token" element={<SharedViewPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

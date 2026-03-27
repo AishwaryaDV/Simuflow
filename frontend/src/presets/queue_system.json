@@ -1,0 +1,62 @@
+{
+  "slug": "queue_system",
+  "name": "Queue-Based Worker",
+  "description": "API decouples writes from processing via a message queue. Workers drain the queue asynchronously.",
+  "category": "patterns",
+  "topology": {
+    "version": "1.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "API Client",
+        "position": { "x": 300, "y": 40 },
+        "nodeType": "client",
+        "config": { "rps": 500, "burst": true }
+      },
+      {
+        "id": "api-1",
+        "label": "API Server",
+        "position": { "x": 300, "y": 180 },
+        "nodeType": "api_server",
+        "config": { "capacity": 2000, "latencyMs": 10, "failureRate": 0.005, "timeoutMs": 3000 }
+      },
+      {
+        "id": "queue-1",
+        "label": "Job Queue",
+        "position": { "x": 300, "y": 340 },
+        "nodeType": "queue",
+        "config": { "delayMs": 50, "maxDepth": 5000 }
+      },
+      {
+        "id": "worker-1",
+        "label": "Worker A",
+        "position": { "x": 160, "y": 500 },
+        "nodeType": "microservice",
+        "config": { "capacity": 300, "latencyMs": 200, "failureRate": 0.02, "timeoutMs": 30000 }
+      },
+      {
+        "id": "worker-2",
+        "label": "Worker B",
+        "position": { "x": 440, "y": 500 },
+        "nodeType": "microservice",
+        "config": { "capacity": 300, "latencyMs": 200, "failureRate": 0.02, "timeoutMs": 30000 }
+      },
+      {
+        "id": "db-1",
+        "label": "Results DB",
+        "position": { "x": 300, "y": 660 },
+        "nodeType": "database",
+        "config": { "capacity": 1000, "latencyMs": 15, "failureRate": 0.001, "timeoutMs": 10000 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "sourceId": "client-1", "targetId": "api-1" },
+      { "id": "e2", "sourceId": "api-1", "targetId": "queue-1", "label": "enqueue" },
+      { "id": "e3", "sourceId": "queue-1", "targetId": "worker-1", "label": "dequeue" },
+      { "id": "e4", "sourceId": "queue-1", "targetId": "worker-2", "label": "dequeue" },
+      { "id": "e5", "sourceId": "worker-1", "targetId": "db-1" },
+      { "id": "e6", "sourceId": "worker-2", "targetId": "db-1" }
+    ],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  }
+}

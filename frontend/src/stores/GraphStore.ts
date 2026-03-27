@@ -11,6 +11,7 @@ class GraphStore {
   diagramName: string = 'Untitled Diagram'
   isDirty: boolean = false
   viewport: CanvasViewport = { x: 0, y: 0, zoom: 1 }
+  loadKey:  number        = 0
 
   constructor() {
     makeObservable(this, {
@@ -21,6 +22,7 @@ class GraphStore {
       diagramName:    observable,
       isDirty:        observable,
       viewport:       observable,
+      loadKey:        observable,
       nodeCount:      computed,
       edgeCount:      computed,
       sourceNodes:    computed,
@@ -136,6 +138,7 @@ class GraphStore {
     this.diagramId      = id ?? null
     this.diagramName    = name ?? 'Untitled Diagram'
     this.isDirty        = false
+    this.loadKey        += 1
   }
 
   clearCanvas() {
@@ -144,6 +147,7 @@ class GraphStore {
     this.selectedNodeId = null
     this.diagramId      = null
     this.isDirty        = false
+    this.loadKey        += 1
   }
 
   markSaved(id: string) {

@@ -1,0 +1,62 @@
+{
+  "slug": "cached_web_app",
+  "name": "Cached Web App",
+  "description": "Adds a Redis-like cache between API servers and the database to reduce DB load.",
+  "category": "fundamentals",
+  "topology": {
+    "version": "1.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "Web Client",
+        "position": { "x": 300, "y": 40 },
+        "nodeType": "client",
+        "config": { "rps": 300, "burst": false }
+      },
+      {
+        "id": "lb-1",
+        "label": "Load Balancer",
+        "position": { "x": 300, "y": 180 },
+        "nodeType": "load_balancer",
+        "config": { "capacity": 10000, "latencyMs": 2, "failureRate": 0, "timeoutMs": 5000, "strategy": "round_robin", "replicas": 2 }
+      },
+      {
+        "id": "api-1",
+        "label": "API Server A",
+        "position": { "x": 160, "y": 340 },
+        "nodeType": "api_server",
+        "config": { "capacity": 1000, "latencyMs": 50, "failureRate": 0.01, "timeoutMs": 5000 }
+      },
+      {
+        "id": "api-2",
+        "label": "API Server B",
+        "position": { "x": 440, "y": 340 },
+        "nodeType": "api_server",
+        "config": { "capacity": 1000, "latencyMs": 50, "failureRate": 0.01, "timeoutMs": 5000 }
+      },
+      {
+        "id": "cache-1",
+        "label": "Redis Cache",
+        "position": { "x": 300, "y": 480 },
+        "nodeType": "cache",
+        "config": { "capacity": 5000, "latencyMs": 5, "failureRate": 0, "timeoutMs": 1000, "hitRate": 0.8 }
+      },
+      {
+        "id": "db-1",
+        "label": "Postgres",
+        "position": { "x": 300, "y": 620 },
+        "nodeType": "database",
+        "config": { "capacity": 500, "latencyMs": 20, "failureRate": 0.001, "timeoutMs": 10000 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "sourceId": "client-1", "targetId": "lb-1" },
+      { "id": "e2", "sourceId": "lb-1", "targetId": "api-1" },
+      { "id": "e3", "sourceId": "lb-1", "targetId": "api-2" },
+      { "id": "e4", "sourceId": "api-1", "targetId": "cache-1" },
+      { "id": "e5", "sourceId": "api-2", "targetId": "cache-1" },
+      { "id": "e6", "sourceId": "cache-1", "targetId": "db-1", "label": "cache miss" }
+    ],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  }
+}

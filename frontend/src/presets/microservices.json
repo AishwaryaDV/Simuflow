@@ -1,0 +1,78 @@
+{
+  "slug": "microservices",
+  "name": "Microservices",
+  "description": "API gateway fans out to three independent services, each with its own database.",
+  "category": "patterns",
+  "topology": {
+    "version": "1.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "Mobile Client",
+        "position": { "x": 380, "y": 40 },
+        "nodeType": "client",
+        "config": { "rps": 150, "burst": true }
+      },
+      {
+        "id": "lb-1",
+        "label": "API Gateway",
+        "position": { "x": 380, "y": 180 },
+        "nodeType": "load_balancer",
+        "config": { "capacity": 5000, "latencyMs": 5, "failureRate": 0, "timeoutMs": 5000, "strategy": "round_robin", "replicas": 1 }
+      },
+      {
+        "id": "svc-users",
+        "label": "User Service",
+        "position": { "x": 140, "y": 340 },
+        "nodeType": "microservice",
+        "config": { "capacity": 800, "latencyMs": 30, "failureRate": 0.005, "timeoutMs": 5000 }
+      },
+      {
+        "id": "svc-orders",
+        "label": "Order Service",
+        "position": { "x": 380, "y": 340 },
+        "nodeType": "microservice",
+        "config": { "capacity": 600, "latencyMs": 40, "failureRate": 0.01, "timeoutMs": 5000 }
+      },
+      {
+        "id": "svc-payment",
+        "label": "Payment Service",
+        "position": { "x": 620, "y": 340 },
+        "nodeType": "microservice",
+        "config": { "capacity": 400, "latencyMs": 80, "failureRate": 0.02, "timeoutMs": 10000 }
+      },
+      {
+        "id": "db-users",
+        "label": "Users DB",
+        "position": { "x": 140, "y": 500 },
+        "nodeType": "database",
+        "config": { "capacity": 300, "latencyMs": 15, "failureRate": 0.001, "timeoutMs": 10000 }
+      },
+      {
+        "id": "db-orders",
+        "label": "Orders DB",
+        "position": { "x": 380, "y": 500 },
+        "nodeType": "database",
+        "config": { "capacity": 400, "latencyMs": 20, "failureRate": 0.001, "timeoutMs": 10000 }
+      },
+      {
+        "id": "db-payment",
+        "label": "Payments DB",
+        "position": { "x": 620, "y": 500 },
+        "nodeType": "database",
+        "config": { "capacity": 200, "latencyMs": 10, "failureRate": 0.0005, "timeoutMs": 10000 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "sourceId": "client-1", "targetId": "lb-1" },
+      { "id": "e2", "sourceId": "lb-1", "targetId": "svc-users" },
+      { "id": "e3", "sourceId": "lb-1", "targetId": "svc-orders" },
+      { "id": "e4", "sourceId": "lb-1", "targetId": "svc-payment" },
+      { "id": "e5", "sourceId": "svc-users", "targetId": "db-users" },
+      { "id": "e6", "sourceId": "svc-orders", "targetId": "db-orders" },
+      { "id": "e7", "sourceId": "svc-payment", "targetId": "db-payment" },
+      { "id": "e8", "sourceId": "svc-orders", "targetId": "svc-payment", "label": "charge" }
+    ],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  }
+}
