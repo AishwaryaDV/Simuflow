@@ -9,6 +9,8 @@ interface PanelState {
   chaos:  boolean
 }
 
+export type CanvasMode = 'select' | 'hand' | 'connect' | 'text' | 'eraser' | 'container'
+
 class UIStore {
   panelState: PanelState = {
     left:   true,
@@ -17,8 +19,9 @@ class UIStore {
     chaos:  false,
   }
   activeModal:        ActiveModal    = null
-  theme:              'dark' | 'light' = 'dark'
+  theme:              'dark' | 'light' = 'light'
   onboardingComplete: boolean        = false
+  canvasMode:         CanvasMode     = 'select'
 
   constructor() {
     makeObservable(this, {
@@ -26,6 +29,7 @@ class UIStore {
       activeModal:        observable,
       theme:              observable,
       onboardingComplete: observable,
+      canvasMode:         observable,
       togglePanel:        action,
       openPanel:          action,
       closePanel:         action,
@@ -33,6 +37,7 @@ class UIStore {
       closeModal:         action,
       setTheme:           action,
       completeOnboarding: action,
+      setCanvasMode:      action,
     })
   }
 
@@ -62,6 +67,10 @@ class UIStore {
 
   completeOnboarding() {
     this.onboardingComplete = true
+  }
+
+  setCanvasMode(mode: CanvasMode) {
+    this.canvasMode = mode
   }
 }
 

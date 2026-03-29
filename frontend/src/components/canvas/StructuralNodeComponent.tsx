@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { NodeResizer, type Node, type NodeProps, type ResizeDragEvent, type ResizeParams } from '@xyflow/react'
+// No Handle imports — structural nodes are not connectable
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
 import { STRUCTURAL_DISPLAY } from './nodeConfig'

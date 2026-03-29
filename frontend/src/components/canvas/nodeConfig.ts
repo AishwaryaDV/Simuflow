@@ -145,6 +145,7 @@ export const STRUCTURAL_DISPLAY: Record<StructuralNodeType, StructuralDisplayCon
   [StructuralNodeType.MemoryFabric]:      { label: 'Memory Fabric',      icon: '🧠',  colorClass: 'bg-pink-50/60',   borderClass: 'border-pink-400',   textClass: 'text-pink-700',   defaultWidth: 250, defaultHeight: 200 },
   [StructuralNodeType.ShardAnnotation]:   { label: 'Shard',              icon: '⬡',   colorClass: 'bg-teal-50/60',   borderClass: 'border-teal-400',   textClass: 'text-teal-700',   defaultWidth: 250, defaultHeight: 150 },
   [StructuralNodeType.ReplicaAnnotation]: { label: 'Replica',            icon: '📋',  colorClass: 'bg-violet-50/60', borderClass: 'border-violet-400', textClass: 'text-violet-700', defaultWidth: 250, defaultHeight: 150 },
+  [StructuralNodeType.TextLabel]:         { label: 'Text',               icon: '📝',  colorClass: 'bg-transparent',  borderClass: 'border-transparent', textClass: 'text-gray-700',  defaultWidth: 200, defaultHeight: 60  },
 }
 
 // ─── Default node factory ─────────────────────────────────────────────────────

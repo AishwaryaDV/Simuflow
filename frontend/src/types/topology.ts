@@ -62,6 +62,7 @@ export enum StructuralNodeType {
   MemoryFabric      = "memory_fabric",
   ShardAnnotation   = "shard_annotation",
   ReplicaAnnotation = "replica_annotation",
+  TextLabel         = "text_label",
 }
 
 export enum LBStrategy {
