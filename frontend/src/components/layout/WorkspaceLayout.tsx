@@ -24,7 +24,7 @@ export default function WorkspaceLayout() {
 
   return (
     <ReactFlowProvider>
-      <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-50">
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-app-bg">
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <NodeLibrary />
