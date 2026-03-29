@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Background,
   ConnectionMode,
+  MarkerType,
   useReactFlow,
   useViewport,
   type Node,
@@ -84,11 +85,13 @@ const CanvasPanel = observer(() => {
   }))
 
   const rfEdges: Edge[] = Array.from(graphStore.edges.values()).map(e => ({
-    id:     e.id,
-    source: e.sourceId,
-    target: e.targetId,
-    type:   'particle' as const,
-    label:  e.label,
+    id:         e.id,
+    source:     e.sourceId,
+    target:     e.targetId,
+    type:       'particle' as const,
+    label:      e.label,
+    selected:   e.id === graphStore.selectedEdgeId,
+    markerEnd:  { type: MarkerType.ArrowClosed, width: 16, height: 16, color: e.id === graphStore.selectedEdgeId ? '#8b5cf6' : '#4a4a6a' },
   }))
 
   // Sync viewport on preset load / clear
@@ -127,6 +130,7 @@ const CanvasPanel = observer(() => {
     runInAction(() => {
       for (const change of changes) {
         if (change.type === 'remove') graphStore.disconnectEdge(change.id)
+        else if (change.type === 'select') graphStore.selectEdge(change.selected ? change.id : null)
       }
     })
   }, [])
@@ -169,7 +173,7 @@ const CanvasPanel = observer(() => {
         return
       }
 
-      runInAction(() => graphStore.selectNode(null))
+      runInAction(() => { graphStore.selectNode(null); graphStore.selectEdge(null) })
     },
     [mode, screenToFlowPosition],
   )
@@ -269,7 +273,7 @@ const CanvasPanel = observer(() => {
         snapToGrid
         snapGrid={SNAP_GRID}
         defaultEdgeOptions={{ type: 'particle' }}
-        deleteKeyCode={mode === 'select' ? 'Delete' : null}
+        deleteKeyCode="Delete"
         minZoom={0.2}
         maxZoom={2}
         style={{ cursor }}

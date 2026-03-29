@@ -8,6 +8,7 @@ class GraphStore {
   edges:           Map<string, SimEdge>        = new Map()
   structuralNodes: Map<string, StructuralNode> = new Map()
   selectedNodeId:  string | null = null
+  selectedEdgeId:  string | null = null
   diagramId:       string | null = null
   diagramName:     string        = 'Untitled Diagram'
   isDirty:         boolean       = false
@@ -20,6 +21,7 @@ class GraphStore {
       edges:                observable,
       structuralNodes:      observable,
       selectedNodeId:       observable,
+      selectedEdgeId:       observable,
       diagramId:            observable,
       diagramName:          observable,
       isDirty:              observable,
@@ -35,10 +37,12 @@ class GraphStore {
       updateNodeConfig:     action,
       connectNodes:         action,
       disconnectEdge:       action,
+      updateEdge:           action,
       addStructuralNode:    action,
       removeStructuralNode: action,
       updateStructuralNode: action,
       selectNode:           action,
+      selectEdge:           action,
       setName:              action,
       setViewport:          action,
       loadTopology:         action,
@@ -111,6 +115,14 @@ class GraphStore {
 
   disconnectEdge(id: string) {
     this.edges.delete(id)
+    if (this.selectedEdgeId === id) this.selectedEdgeId = null
+    this.isDirty = true
+  }
+
+  updateEdge(id: string, patch: Partial<SimEdge>) {
+    const edge = this.edges.get(id)
+    if (!edge) return
+    this.edges.set(id, { ...edge, ...patch })
     this.isDirty = true
   }
 
@@ -140,6 +152,12 @@ class GraphStore {
 
   selectNode(id: string | null) {
     this.selectedNodeId = id
+    if (id) this.selectedEdgeId = null
+  }
+
+  selectEdge(id: string | null) {
+    this.selectedEdgeId = id
+    if (id) this.selectedNodeId = null
   }
 
   setName(name: string) {

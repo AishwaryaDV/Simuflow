@@ -58,7 +58,7 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
       </div>
 
       {/* Label below */}
-      <span className="text-[11px] font-medium text-white/80 truncate max-w-[72px] text-center leading-tight">
+      <span className="text-[11px] font-semibold text-white/90 truncate max-w-[100px] text-center leading-tight">
         {simNode.label}
       </span>
     </div>
