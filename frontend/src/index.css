@@ -2,28 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark theme (default) ───────────────────────────────────────────────────── */
 :root {
+  --app-bg:          #0c0c13;
+  --app-surface:     #13131e;
+  --app-elevated:    #1c1c2a;
+  --app-border:      #2a2a3d;
+  --app-accent:      #8b5cf6;
+  --app-accent-dim:  #6d28d9;
+  --app-text:        #f0eefb;
+  --app-text-2:      #c4c0dc;
+  --app-text-3:      #8c88a8;
+}
+
+/* ── Light theme (toggled via data-theme="light" on <html>) ─────────────────── */
+[data-theme="light"] {
+  --app-bg:          #f5f4fc;
+  --app-surface:     #ffffff;
+  --app-elevated:    #eeedf8;
+  --app-border:      #dddbe8;
+  --app-accent:      #7c3aed;
+  --app-accent-dim:  #6d28d9;
+  --app-text:        #1a1828;
+  --app-text-2:      #6b6880;
+  --app-text-3:      #a09db8;
+}
+
+/* ── Base resets ─────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; padding: 0; }
+
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
+#root { width: 100%; height: 100%; }
+
+/* ── Hide scrollbars visually (keep scroll functional) ──────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Form element overrides ──────────────────────────────────────────────────── */
+select option {
+  background-color: var(--app-elevated);
+  color: var(--app-text);
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.4;
+  filter: invert(1);
 }
 
-body {
-  margin: 0;
-  padding: 0;
-}
-
-#root {
-  width: 100%;
-  height: 100%;
-}
-
-html,
-body {
-  height: 100%;
-}
+/* ── ReactFlow overrides for dark canvas ─────────────────────────────────────── */
+.react-flow__background { background: var(--app-bg) !important; }
+.react-flow__controls { background: var(--app-surface) !important; border: 1px solid var(--app-border) !important; border-radius: 10px !important; }
+.react-flow__controls-button { background: var(--app-surface) !important; border-bottom: 1px solid var(--app-border) !important; color: var(--app-text-2) !important; fill: var(--app-text-2) !important; }
+.react-flow__controls-button:hover { background: var(--app-elevated) !important; }
+.react-flow__edge-path { stroke: #3d3a52 !important; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--app-accent) !important; }
