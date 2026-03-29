@@ -30,6 +30,15 @@ class SimulationStore {
 
   private _elapsedTimer: ReturnType<typeof setInterval> | null = null
 
+  /** Set by useWorkerBridge — null until the worker is mounted. */
+  _bridge: {
+    start:    () => void
+    pause:    () => void
+    resume:   () => void
+    stop:     () => void
+    setSpeed: (s: number) => void
+  } | null = null
+
   constructor() {
     makeObservable(this, {
       status:         observable,
@@ -86,21 +95,25 @@ class SimulationStore {
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   start() {
+    this._bridge?.start()
     this.status = SimulationStatus.Running
     this._startTimer()
   }
 
   pause() {
+    this._bridge?.pause()
     this.status = SimulationStatus.Paused
     this._stopTimer()
   }
 
   resume() {
+    this._bridge?.resume()
     this.status = SimulationStatus.Running
     this._startTimer()
   }
 
   stop() {
+    this._bridge?.stop()
     this._stopTimer()
     this.status = SimulationStatus.Idle
     this.reset()
@@ -117,6 +130,7 @@ class SimulationStore {
 
   setSpeed(speed: 0.25 | 0.5 | 1 | 2 | 4) {
     this.speed = speed
+    this._bridge?.setSpeed(speed)
   }
 
   /**
