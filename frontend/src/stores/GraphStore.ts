@@ -1,44 +1,49 @@
 import { makeObservable, observable, action, computed } from 'mobx'
 import { nanoid } from 'nanoid'
-import type { SimNode, SimEdge, TopologySchema, CanvasViewport } from '../types/topology'
+import type { SimNode, SimEdge, StructuralNode, TopologySchema, CanvasViewport } from '../types/topology'
 import { TOPOLOGY_VERSION } from '../types/topology'
 
 class GraphStore {
-  nodes: Map<string, SimNode> = new Map()
-  edges: Map<string, SimEdge> = new Map()
-  selectedNodeId: string | null = null
-  diagramId: string | null = null
-  diagramName: string = 'Untitled Diagram'
-  isDirty: boolean = false
-  viewport: CanvasViewport = { x: 0, y: 0, zoom: 1 }
-  loadKey:  number        = 0
+  nodes:           Map<string, SimNode>        = new Map()
+  edges:           Map<string, SimEdge>        = new Map()
+  structuralNodes: Map<string, StructuralNode> = new Map()
+  selectedNodeId:  string | null = null
+  diagramId:       string | null = null
+  diagramName:     string        = 'Untitled Diagram'
+  isDirty:         boolean       = false
+  viewport:        CanvasViewport = { x: 0, y: 0, zoom: 1 }
+  loadKey:         number         = 0
 
   constructor() {
     makeObservable(this, {
-      nodes:          observable,
-      edges:          observable,
-      selectedNodeId: observable,
-      diagramId:      observable,
-      diagramName:    observable,
-      isDirty:        observable,
-      viewport:       observable,
-      loadKey:        observable,
-      nodeCount:      computed,
-      edgeCount:      computed,
-      sourceNodes:    computed,
-      terminalNodes:  computed,
-      topology:       computed,
-      addNode:        action,
-      removeNode:     action,
-      updateNodeConfig: action,
-      connectNodes:   action,
-      disconnectEdge: action,
-      selectNode:     action,
-      setName:        action,
-      setViewport:    action,
-      loadTopology:   action,
-      clearCanvas:    action,
-      markSaved:      action,
+      nodes:                observable,
+      edges:                observable,
+      structuralNodes:      observable,
+      selectedNodeId:       observable,
+      diagramId:            observable,
+      diagramName:          observable,
+      isDirty:              observable,
+      viewport:             observable,
+      loadKey:              observable,
+      nodeCount:            computed,
+      edgeCount:            computed,
+      sourceNodes:          computed,
+      terminalNodes:        computed,
+      topology:             computed,
+      addNode:              action,
+      removeNode:           action,
+      updateNodeConfig:     action,
+      connectNodes:         action,
+      disconnectEdge:       action,
+      addStructuralNode:    action,
+      removeStructuralNode: action,
+      updateStructuralNode: action,
+      selectNode:           action,
+      setName:              action,
+      setViewport:          action,
+      loadTopology:         action,
+      clearCanvas:          action,
+      markSaved:            action,
     })
   }
 
@@ -52,29 +57,27 @@ class GraphStore {
     return this.edges.size
   }
 
-  /** Nodes with no incoming edges — traffic sources */
   get sourceNodes(): SimNode[] {
     const targeted = new Set(Array.from(this.edges.values()).map(e => e.targetId))
     return Array.from(this.nodes.values()).filter(n => !targeted.has(n.id))
   }
 
-  /** Nodes with no outgoing edges — traffic terminals */
   get terminalNodes(): SimNode[] {
     const sourced = new Set(Array.from(this.edges.values()).map(e => e.sourceId))
     return Array.from(this.nodes.values()).filter(n => !sourced.has(n.id))
   }
 
-  /** Full serialisable topology — what gets saved to Supabase */
   get topology(): TopologySchema {
     return {
-      version:  TOPOLOGY_VERSION,
-      nodes:    Array.from(this.nodes.values()),
-      edges:    Array.from(this.edges.values()),
-      viewport: this.viewport,
+      version:        TOPOLOGY_VERSION,
+      nodes:          Array.from(this.nodes.values()),
+      edges:          Array.from(this.edges.values()),
+      structuralNodes: Array.from(this.structuralNodes.values()),
+      viewport:       this.viewport,
     }
   }
 
-  // ─── Actions ───────────────────────────────────────────────────────────────
+  // ─── Simulation node actions ───────────────────────────────────────────────
 
   addNode(node: Omit<SimNode, 'id'> & { id?: string }): string {
     const id = node.id ?? nanoid()
@@ -85,11 +88,8 @@ class GraphStore {
 
   removeNode(id: string) {
     this.nodes.delete(id)
-    // Remove all edges connected to this node
     for (const [edgeId, edge] of this.edges) {
-      if (edge.sourceId === id || edge.targetId === id) {
-        this.edges.delete(edgeId)
-      }
+      if (edge.sourceId === id || edge.targetId === id) this.edges.delete(edgeId)
     }
     if (this.selectedNodeId === id) this.selectedNodeId = null
     this.isDirty = true
@@ -114,6 +114,30 @@ class GraphStore {
     this.isDirty = true
   }
 
+  // ─── Structural node actions ───────────────────────────────────────────────
+
+  addStructuralNode(node: Omit<StructuralNode, 'id'> & { id?: string }): string {
+    const id = node.id ?? nanoid()
+    this.structuralNodes.set(id, { ...node, id } as StructuralNode)
+    this.isDirty = true
+    return id
+  }
+
+  removeStructuralNode(id: string) {
+    this.structuralNodes.delete(id)
+    if (this.selectedNodeId === id) this.selectedNodeId = null
+    this.isDirty = true
+  }
+
+  updateStructuralNode(id: string, patch: Partial<StructuralNode>) {
+    const node = this.structuralNodes.get(id)
+    if (!node) return
+    this.structuralNodes.set(id, { ...node, ...patch })
+    this.isDirty = true
+  }
+
+  // ─── Shared actions ────────────────────────────────────────────────────────
+
   selectNode(id: string | null) {
     this.selectedNodeId = id
   }
@@ -127,12 +151,14 @@ class GraphStore {
     this.viewport = viewport
   }
 
-  /** Load a full topology onto the canvas — used by presets and load-from-Supabase */
   loadTopology(topology: TopologySchema, id?: string, name?: string) {
     this.nodes.clear()
     this.edges.clear()
+    this.structuralNodes.clear()
     for (const node of topology.nodes) this.nodes.set(node.id, node)
     for (const edge of topology.edges) this.edges.set(edge.id, edge)
+    // structuralNodes may be absent in v1.0 topologies
+    for (const sn of topology.structuralNodes ?? []) this.structuralNodes.set(sn.id, sn)
     this.viewport       = topology.viewport
     this.selectedNodeId = null
     this.diagramId      = id ?? null
@@ -144,6 +170,7 @@ class GraphStore {
   clearCanvas() {
     this.nodes.clear()
     this.edges.clear()
+    this.structuralNodes.clear()
     this.selectedNodeId = null
     this.diagramId      = null
     this.isDirty        = false
