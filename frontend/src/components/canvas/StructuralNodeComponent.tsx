@@ -47,7 +47,7 @@ export default function StructuralNodeComponent({ data, selected }: NodeProps<St
       >
         {/* Label badge */}
         <div className={`absolute top-2 left-3 flex items-center gap-1.5 pointer-events-none`}>
-          <span className="text-sm">{display.icon}</span>
+          {(() => { const Icon = display.icon; return <Icon size={14} className={display.textClass} strokeWidth={1.8} /> })()}
           <span className={`text-xs font-semibold ${display.textClass}`}>
             {structuralNode.label || display.label}
           </span>
