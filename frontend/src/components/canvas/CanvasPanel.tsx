@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef } from 'react'
 import {
   ReactFlow,
   Background,
-  Controls,
   ConnectionMode,
   useReactFlow,
+  useViewport,
   type Node,
   type Edge,
   type Connection,
@@ -31,6 +31,20 @@ const STRUCT_TYPES = new Set(Object.values(StructuralNodeType))
 // Keyboard shortcut → canvas mode
 const KEY_MODE_MAP: Record<string, Parameters<typeof uiStore.setCanvasMode>[0]> = {
   v: 'select', h: 'hand', c: 'connect', b: 'container', t: 'text', e: 'eraser',
+}
+
+function ZoomDisplay() {
+  const { zoom } = useViewport()
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  return (
+    <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 bg-app-surface border border-app-border rounded-lg px-2 py-1 shadow-md shadow-black/20">
+      <button onClick={() => zoomOut({ duration: 150 })} className="w-6 h-6 flex items-center justify-center text-app-text-2 hover:text-app-text text-base leading-none rounded hover:bg-app-elevated transition-colors" title="Zoom out">−</button>
+      <span className="text-[11px] text-app-text-2 w-10 text-center select-none tabular-nums">{Math.round(zoom * 100)}%</span>
+      <button onClick={() => zoomIn({ duration: 150 })} className="w-6 h-6 flex items-center justify-center text-app-text-2 hover:text-app-text text-base leading-none rounded hover:bg-app-elevated transition-colors" title="Zoom in">+</button>
+      <div className="w-px h-4 bg-app-border mx-0.5" />
+      <button onClick={() => fitView({ duration: 300, padding: 0.15 })} className="text-[10px] text-app-text-3 hover:text-app-text-2 px-1 rounded hover:bg-app-elevated transition-colors" title="Fit view">Fit</button>
+    </div>
+  )
 }
 
 const CanvasPanel = observer(() => {
@@ -89,19 +103,21 @@ const CanvasPanel = observer(() => {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     runInAction(() => {
       for (const change of changes) {
-        const isStructural = graphStore.structuralNodes.has(change.id)
+        if (!('id' in change)) continue
+        const id = change.id
+        const isStructural = graphStore.structuralNodes.has(id)
 
         if (change.type === 'position' && !change.dragging && change.position) {
-          if (isStructural) graphStore.updateStructuralNode(change.id, { position: change.position })
-          else graphStore.updateNodeConfig(change.id, { position: change.position } as any)
+          if (isStructural) graphStore.updateStructuralNode(id, { position: change.position })
+          else graphStore.updateNodeConfig(id, { position: change.position } as any)
 
         } else if (change.type === 'remove') {
-          if (isStructural) graphStore.removeStructuralNode(change.id)
-          else graphStore.removeNode(change.id)
+          if (isStructural) graphStore.removeStructuralNode(id)
+          else graphStore.removeNode(id)
 
         } else if (change.type === 'select') {
-          if (change.selected) graphStore.selectNode(change.id)
-          else if (graphStore.selectedNodeId === change.id) graphStore.selectNode(null)
+          if (change.selected) graphStore.selectNode(id)
+          else if (graphStore.selectedNodeId === id) graphStore.selectNode(null)
         }
       }
     })
@@ -223,6 +239,16 @@ const CanvasPanel = observer(() => {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <CanvasToolbar />
 
+      {/* Connect-mode hint */}
+      {mode === 'connect' && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+          <div className="flex items-center gap-2 bg-app-elevated border border-app-accent/40 rounded-lg px-3 py-1.5 shadow-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-app-accent animate-pulse shrink-0" />
+            <span className="text-xs text-app-text-2">Click a source node, then a destination to connect them</span>
+          </div>
+        </div>
+      )}
+
       <ReactFlow
         nodes={[...rfStructNodes, ...rfSimNodes]}
         edges={rfEdges}
@@ -249,8 +275,8 @@ const CanvasPanel = observer(() => {
         style={{ cursor }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={20} color="#e2e8f0" />
-        <Controls showInteractive={false} />
+        <Background gap={20} color="#2a2a3d" variant={'dots' as any} />
+        <ZoomDisplay />
       </ReactFlow>
     </div>
   )
