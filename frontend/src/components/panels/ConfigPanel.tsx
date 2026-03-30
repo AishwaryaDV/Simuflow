@@ -1,5 +1,6 @@
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
+import { useState, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
 import {
@@ -38,10 +39,29 @@ const inputCls = 'text-sm border border-app-border bg-app-elevated text-app-text
 function NumInput({ value, onChange, min, max, step }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number
 }) {
+  const [local, setLocal] = useState(String(value))
+
+  // Sync if external value changes (e.g. preset load)
+  useEffect(() => { setLocal(String(value)) }, [value])
+
   return (
-    <input type="number" value={value} min={min} max={max} step={step ?? 1}
-      onChange={e => onChange(Number(e.target.value))}
-      className={inputCls} />
+    <input
+      type="number"
+      value={local}
+      min={min} max={max} step={step ?? 1}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => {
+        const n = Number(local)
+        if (!isNaN(n) && local.trim() !== '') {
+          const clamped = min !== undefined ? Math.max(min, n) : n
+          onChange(clamped)
+          setLocal(String(clamped))
+        } else {
+          setLocal(String(value)) // revert if invalid
+        }
+      }}
+      className={inputCls}
+    />
   )
 }
 
