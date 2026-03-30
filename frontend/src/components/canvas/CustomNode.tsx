@@ -1,9 +1,12 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { observer } from 'mobx-react-lite'
-import { NodeHealth } from '../../types/topology'
+import { NodeHealth, NodeType } from '../../types/topology'
 import type { SimNode } from '../../types/topology'
 import { simulationStore } from '../../stores/SimulationStore'
 import { NODE_DISPLAY } from './nodeConfig'
+
+/** Nodes that generate traffic — utilisation % is meaningless for these */
+const NO_CAPACITY_NODES = new Set([NodeType.Client])
 
 export type CustomNodeData = { simNode: SimNode }
 export type CustomNodeType = Node<CustomNodeData, 'custom'>
@@ -49,8 +52,8 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
 
         <Icon size={22} className={display.textClass} strokeWidth={1.8} />
 
-        {/* Utilisation chip */}
-        {runtime && (
+        {/* Utilisation chip — hidden on source nodes that have no capacity */}
+        {runtime && !NO_CAPACITY_NODES.has(simNode.nodeType) && (
           <span className="absolute -top-2 -right-2 bg-app-elevated border border-app-border text-app-text text-[9px] font-bold rounded-full px-1 py-0.5 leading-none">
             {Math.round(runtime.utilisationPct)}%
           </span>
