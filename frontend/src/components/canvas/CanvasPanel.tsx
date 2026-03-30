@@ -55,13 +55,24 @@ const CanvasPanel = observer(() => {
   // Click-to-connect state: first click sets pending source
   const [pendingSource, setPendingSource] = useState<string | null>(null)
 
-  // ── Keyboard shortcuts for mode switching ─────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const m = KEY_MODE_MAP[e.key.toLowerCase()]
       if (m) { runInAction(() => uiStore.setCanvasMode(m)); setPendingSource(null) }
       if (e.key === 'Escape') setPendingSource(null)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        runInAction(() => {
+          if (graphStore.selectedEdgeId) {
+            graphStore.disconnectEdge(graphStore.selectedEdgeId)
+          } else if (graphStore.selectedNodeId) {
+            const id = graphStore.selectedNodeId
+            if (graphStore.structuralNodes.has(id)) graphStore.removeStructuralNode(id)
+            else graphStore.removeNode(id)
+          }
+        })
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -87,15 +98,20 @@ const CanvasPanel = observer(() => {
     zIndex:   -1,
   }))
 
-  const rfEdges: Edge[] = Array.from(graphStore.edges.values()).map(e => ({
-    id:         e.id,
-    source:     e.sourceId,
-    target:     e.targetId,
-    type:       'particle' as const,
-    label:      e.label,
-    selected:   e.id === graphStore.selectedEdgeId,
-    markerEnd:  { type: MarkerType.ArrowClosed, width: 16, height: 16, color: e.id === graphStore.selectedEdgeId ? '#8b5cf6' : '#4a4a6a' },
-  }))
+  const rfEdges: Edge[] = Array.from(graphStore.edges.values()).map(e => {
+    const isSelected = e.id === graphStore.selectedEdgeId
+    const arrowColor = isSelected ? '#8b5cf6' : '#4a4a6a'
+    return {
+      id:          e.id,
+      source:      e.sourceId,
+      target:      e.targetId,
+      type:        'particle' as const,
+      label:       e.label,
+      selected:    isSelected,
+      markerEnd:   { type: MarkerType.ArrowClosed, width: 16, height: 16, color: arrowColor },
+      markerStart: e.bidirectional ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: arrowColor } : undefined,
+    }
+  })
 
   // Sync viewport on preset load / clear
   useEffect(() => {
@@ -140,6 +156,7 @@ const CanvasPanel = observer(() => {
 
   const onConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) return
+    if (connection.source === connection.target) return
     runInAction(() => graphStore.connectNodes(connection.source!, connection.target!))
   }, [])
 
@@ -296,7 +313,7 @@ const CanvasPanel = observer(() => {
         snapToGrid
         snapGrid={SNAP_GRID}
         defaultEdgeOptions={{ type: 'particle' }}
-        deleteKeyCode="Delete"
+        deleteKeyCode={null}
         minZoom={0.2}
         maxZoom={2}
         style={{ cursor }}
