@@ -122,12 +122,17 @@ function buildAdjacency(nodes: SimNode[], edges: SimEdge[]) {
   return { outEdges, inEdges }
 }
 
-/** Kahn's algorithm — returns nodes in processing order */
-function topoSort(nodes: SimNode[], inEdges: Map<string, { edgeId: string; sourceId: string }[]>): SimNode[] {
+/** Kahn's algorithm — returns nodes in processing order (source → sink) */
+function topoSort(
+  nodes: SimNode[],
+  inEdges:  Map<string, { edgeId: string; sourceId: string }[]>,
+  outEdges: Map<string, { edgeId: string; targetId: string }[]>,
+): SimNode[] {
+  const nodeMap  = new Map<string, SimNode>(nodes.map(n => [n.id, n]))
   const inDegree = new Map<string, number>()
   for (const n of nodes) inDegree.set(n.id, inEdges.get(n.id)?.length ?? 0)
 
-  const queue  = nodes.filter(n => inDegree.get(n.id) === 0)
+  const queue   = nodes.filter(n => (inDegree.get(n.id) ?? 0) === 0)
   const result: SimNode[] = []
   const visited = new Set<string>()
 
@@ -136,10 +141,18 @@ function topoSort(nodes: SimNode[], inEdges: Map<string, { edgeId: string; sourc
     if (visited.has(node.id)) continue
     visited.add(node.id)
     result.push(node)
-    // decrement in-degree of successors — but we don't have outEdges here
-    // so just append all remaining nodes after sorted ones
+
+    for (const { targetId } of outEdges.get(node.id) ?? []) {
+      const deg = (inDegree.get(targetId) ?? 1) - 1
+      inDegree.set(targetId, deg)
+      if (deg === 0 && !visited.has(targetId)) {
+        const target = nodeMap.get(targetId)
+        if (target) queue.push(target)
+      }
+    }
   }
-  // Append any nodes not reached (cycles / islands)
+
+  // Append any nodes not reached (cycles / disconnected islands)
   for (const n of nodes) { if (!visited.has(n.id)) result.push(n) }
   return result
 }
@@ -340,9 +353,9 @@ function computeNodeFlow(node: SimNode, incomingRps: number): NodeFlow {
 // ── Health from utilisation ───────────────────────────────────────────────────
 
 function healthFrom(utilisationPct: number, errorRate: number): NodeHealth {
-  if (errorRate >= 1)       return NodeHealth.Failed
-  if (utilisationPct > 90)  return NodeHealth.Bottleneck
-  if (utilisationPct > 60)  return NodeHealth.Stressed
+  if (errorRate >= 0.5)      return NodeHealth.Failed
+  if (utilisationPct >= 90)  return NodeHealth.Bottleneck
+  if (utilisationPct >= 60)  return NodeHealth.Stressed
   return NodeHealth.Healthy
 }
 
@@ -363,7 +376,7 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
   const simNodes = nodes.filter(n => n.nodeType !== undefined)
 
   const { outEdges, inEdges } = buildAdjacency(simNodes, edges)
-  const sorted = topoSort(simNodes, inEdges)
+  const sorted = topoSort(simNodes, inEdges, outEdges)
 
   // outflow[nodeId] = rps leaving that node
   const outflow  = new Map<string, number>()
