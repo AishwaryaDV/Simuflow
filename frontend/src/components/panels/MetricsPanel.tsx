@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
+import { runInAction } from 'mobx'
 import {
   AreaChart, Area, ResponsiveContainer, Tooltip,
 } from 'recharts'
-import { ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
+import { ChevronUp, ChevronDown, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react'
 import { simulationStore } from '../../stores/SimulationStore'
+import { costStore } from '../../stores/CostStore'
 import { graphStore } from '../../stores/GraphStore'
 import { SimulationStatus } from '../../types/topology'
 
@@ -75,7 +77,8 @@ function LatencyStat({ label, value, warn }: { label: string; value: number; war
 // ── MetricsPanel ───────────────────────────────────────────────────────────────
 
 const MetricsPanel = observer(() => {
-  const [open, setOpen] = useState(true)
+  const [metricsOpen, setMetricsOpen] = useState(true)
+  const [costOpen, setCostOpen] = useState(true)
   const { status, globalMetrics, metricsHistory, bottleneckNodes } = simulationStore
 
   if (status === SimulationStatus.Idle) return null
@@ -91,32 +94,41 @@ const MetricsPanel = observer(() => {
     .map(id => graphStore.nodes.get(id)?.label ?? id)
     .join(', ')
 
+  const rate  = costStore.currentRatePerHr
+  const spent = costStore.spentUsd
+  const pct   = costStore.spentPct
+  const over  = costStore.isOverBudget
+
+  const fmtUsd = (v: number) =>
+    v < 0.01 ? `$${(v * 100).toFixed(3)}¢` : `$${v.toFixed(v < 10 ? 3 : 2)}`
+
   return (
     <div className="border-t border-app-border bg-app-surface shrink-0">
 
-      {/* Toggle bar */}
+      {/* ── Metrics strip ──────────────────────────────────────────────────── */}
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setMetricsOpen(v => !v)}
         className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-app-elevated/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-app-text-3">Metrics</span>
+          <div className="flex items-center gap-1.5">
+            <TrendingUp size={11} className="text-app-text-3" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-app-text-3">Metrics</span>
+          </div>
 
-          {/* Bottleneck banner inline when collapsed */}
-          {!open && bottleneckLabels && (
+          {!metricsOpen && bottleneckLabels && (
             <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5">
               <AlertTriangle size={10} className="text-orange-400 shrink-0" />
               <span className="text-[10px] text-orange-400 font-medium">Bottleneck: {bottleneckLabels}</span>
             </div>
           )}
         </div>
-        {open ? <ChevronDown size={13} className="text-app-text-3" /> : <ChevronUp size={13} className="text-app-text-3" />}
+        {metricsOpen ? <ChevronDown size={13} className="text-app-text-3" /> : <ChevronUp size={13} className="text-app-text-3" />}
       </button>
 
-      {open && (
+      {metricsOpen && (
         <div className="px-4 pb-3">
 
-          {/* Bottleneck banner */}
           {bottleneckLabels && (
             <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-1.5 mb-3">
               <AlertTriangle size={12} className="text-orange-400 shrink-0" />
@@ -128,7 +140,6 @@ const MetricsPanel = observer(() => {
 
           <div className="flex gap-4 items-start">
 
-            {/* Throughput sparkline */}
             <Sparkline
               data={chartData}
               dataKey="throughput"
@@ -144,7 +155,6 @@ const MetricsPanel = observer(() => {
 
             <div className="w-px self-stretch bg-app-border shrink-0" />
 
-            {/* Error rate sparkline */}
             <Sparkline
               data={chartData}
               dataKey="errorPct"
@@ -156,7 +166,6 @@ const MetricsPanel = observer(() => {
 
             <div className="w-px self-stretch bg-app-border shrink-0" />
 
-            {/* Latency percentiles */}
             <div className="flex flex-col gap-1.5 shrink-0 w-36">
               <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">Latency</span>
               <div className="flex flex-col gap-1.5 mt-0.5">
@@ -168,7 +177,6 @@ const MetricsPanel = observer(() => {
 
             <div className="w-px self-stretch bg-app-border shrink-0" />
 
-            {/* System health score */}
             <div className="flex flex-col gap-1.5 shrink-0 w-28">
               <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">System health</span>
               <div className="flex items-end gap-1 mt-1">
@@ -196,6 +204,119 @@ const MetricsPanel = observer(() => {
           </div>
         </div>
       )}
+
+      {/* ── Cost strip ─────────────────────────────────────────────────────── */}
+      <div className="border-t border-app-border/60">
+        <button
+          onClick={() => setCostOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-app-elevated/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <DollarSign size={11} className="text-app-text-3" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-app-text-3">Cost</span>
+            </div>
+
+            {/* Inline summary when collapsed */}
+            {!costOpen && (
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-app-text-2 tabular-nums">
+                  <span className="text-app-text-3">Rate </span>{fmtUsd(rate)}/hr
+                </span>
+                <span className="text-[10px] text-app-text-2 tabular-nums">
+                  <span className="text-app-text-3">Spent </span>{fmtUsd(spent)}
+                </span>
+                {over && (
+                  <span className="text-[10px] text-red-400 font-semibold">Over budget</span>
+                )}
+              </div>
+            )}
+          </div>
+          {costOpen ? <ChevronDown size={13} className="text-app-text-3" /> : <ChevronUp size={13} className="text-app-text-3" />}
+        </button>
+
+        {costOpen && (
+          <div className="px-4 pb-3 flex items-start gap-6">
+
+            {/* Rate */}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">Rate</span>
+              <span className="text-lg font-bold tabular-nums text-app-text leading-none">
+                {fmtUsd(rate)}
+              </span>
+              <span className="text-[10px] text-app-text-3">per hour</span>
+            </div>
+
+            <div className="w-px self-stretch bg-app-border shrink-0" />
+
+            {/* Spent */}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">SIM Spent</span>
+              <span className={`text-lg font-bold tabular-nums leading-none ${over ? 'text-red-400' : 'text-app-text'}`}>
+                {fmtUsd(spent)}
+              </span>
+              <span className="text-[10px] text-app-text-3">simulated time</span>
+            </div>
+
+            <div className="w-px self-stretch bg-app-border shrink-0" />
+
+            {/* Budget + progress */}
+            <div className="flex flex-col gap-1.5 min-w-40">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">Budget</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-app-text-3">$</span>
+                  <input
+                    type="number"
+                    value={costStore.budgetUsd}
+                    min={0.01}
+                    step={1}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) runInAction(() => costStore.setBudget(v))
+                    }}
+                    className="w-14 text-xs font-bold text-app-text bg-app-elevated border border-app-border rounded px-1.5 py-0.5 text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-app-accent"
+                  />
+                </div>
+              </div>
+              <div className="h-2 bg-app-elevated rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    over ? 'bg-red-400' : pct > 75 ? 'bg-orange-400' : 'bg-green-400'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-app-text-3 tabular-nums">{pct.toFixed(1)}% used</span>
+                {over && <span className="text-[10px] text-red-400 font-semibold">Over budget!</span>}
+              </div>
+            </div>
+
+            <div className="w-px self-stretch bg-app-border shrink-0" />
+
+            {/* Top cost contributors */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-app-text-3">Top costs</span>
+              {costStore.topCostNodes.length === 0 ? (
+                <span className="text-[10px] text-app-text-3 italic">No billable nodes</span>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {costStore.topCostNodes.map(n => (
+                    <div key={n.label} className="flex items-center justify-between gap-4">
+                      <span className="text-[10px] text-app-text-2 truncate max-w-24">{n.label}</span>
+                      <span className="text-[10px] font-bold tabular-nums text-app-text shrink-0">
+                        {fmtUsd(n.rateHr)}/hr
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+      </div>
     </div>
   )
 })
