@@ -1,6 +1,8 @@
 import { observer } from 'mobx-react-lite'
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from '@xyflow/react'
 import { simulationStore } from '../../stores/SimulationStore'
+import { graphStore } from '../../stores/GraphStore'
+import { NodeHealth } from '../../types/topology'
 
 function Particle({ path, duration, delay, color }: {
   path: string; duration: number; delay: number; color: string
@@ -28,14 +30,27 @@ const ParticleEdge = observer(({
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
-    borderRadius: 8,
+    borderRadius: 12,
   })
 
   const flow     = simulationStore.edgeFlows.get(id)
   const isActive = simulationStore.isRunning && !!flow && flow.throughput > 0
   const count    = isActive ? Math.max(1, flow!.particleCount) : 0
   const hasError = (flow?.errorRatio ?? 0) > 0.1
-  const baseDur  = isActive ? Math.max(0.4, 2.5 - (flow!.throughput / 500)) : 2
+
+  // Speed = health state (dominant) + slight throughput nudge within each tier
+  const targetId     = graphStore.edges.get(id)?.targetId
+  const targetHealth = targetId ? simulationStore.nodeStates.get(targetId)?.health : undefined
+  const throughput   = flow?.throughput ?? 0
+  // Throughput nudge: up to 0.4s faster at high RPS, within each health band
+  const tpNudge = Math.min(0.4, throughput / 2500)
+  const baseDur = !isActive ? 3
+    : targetHealth === NodeHealth.Bottleneck || targetHealth === NodeHealth.Failed
+      ? Math.max(0.9, 1.2 - tpNudge)
+    : targetHealth === NodeHealth.Stressed
+      ? Math.max(1.4, 1.8 - tpNudge)
+    : Math.max(2.0, 2.5 - tpNudge)
+
   const partColor= hasError ? '#f87171' : '#a78bfa'
 
   const strokeColor = selected
