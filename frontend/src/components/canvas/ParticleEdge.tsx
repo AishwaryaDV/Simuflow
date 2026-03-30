@@ -4,8 +4,8 @@ import { simulationStore } from '../../stores/SimulationStore'
 import { graphStore } from '../../stores/GraphStore'
 import { NodeHealth } from '../../types/topology'
 
-function Particle({ path, duration, delay, color }: {
-  path: string; duration: number; delay: number; color: string
+function Particle({ path, duration, delay, color, reverse }: {
+  path: string; duration: number; delay: number; color: string; reverse?: boolean
 }) {
   return (
     <circle r={2.5} fill={color} opacity={0.9}>
@@ -14,6 +14,9 @@ function Particle({ path, duration, delay, color }: {
         begin={`${delay}s`}
         repeatCount="indefinite"
         path={path}
+        keyPoints={reverse ? '1;0' : '0;1'}
+        keyTimes="0;1"
+        calcMode="linear"
       />
     </circle>
   )
@@ -33,13 +36,16 @@ const ParticleEdge = observer(({
     borderRadius: 12,
   })
 
+  const edgeMeta = graphStore.edges.get(id)
+  const isBidirectional = edgeMeta?.bidirectional ?? false
+
   const flow     = simulationStore.edgeFlows.get(id)
   const isActive = simulationStore.isRunning && !!flow && flow.throughput > 0
   const count    = isActive ? Math.max(1, flow!.particleCount) : 0
   const hasError = (flow?.errorRatio ?? 0) > 0.1
 
   // Speed = health state (dominant) + slight throughput nudge within each tier
-  const targetId     = graphStore.edges.get(id)?.targetId
+  const targetId     = edgeMeta?.targetId
   const targetHealth = targetId ? simulationStore.nodeStates.get(targetId)?.health : undefined
   const throughput   = flow?.throughput ?? 0
   // Throughput nudge: up to 0.4s faster at high RPS, within each health band
@@ -63,6 +69,7 @@ const ParticleEdge = observer(({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
+        markerStart={isBidirectional ? markerEnd : undefined}
         style={{
           stroke: strokeColor,
           strokeWidth: selected || isActive ? 1.5 : 1,
@@ -70,13 +77,26 @@ const ParticleEdge = observer(({
         }}
       />
 
+      {/* Forward particles */}
       {isActive && Array.from({ length: count }, (_, i) => (
         <Particle
-          key={i}
+          key={`f-${i}`}
           path={edgePath}
           duration={baseDur}
           delay={(i / count) * baseDur}
           color={partColor}
+        />
+      ))}
+
+      {/* Reverse particles when bidirectional */}
+      {isActive && isBidirectional && Array.from({ length: count }, (_, i) => (
+        <Particle
+          key={`r-${i}`}
+          path={edgePath}
+          duration={baseDur}
+          delay={(i / count) * baseDur}
+          color={partColor}
+          reverse
         />
       ))}
 
