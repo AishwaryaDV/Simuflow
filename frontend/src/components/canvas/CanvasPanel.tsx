@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -52,13 +52,16 @@ const CanvasPanel = observer(() => {
   const { setViewport, screenToFlowPosition } = useReactFlow()
   const prevLoadKey = useRef(graphStore.loadKey)
   const mode = uiStore.canvasMode
+  // Click-to-connect state: first click sets pending source
+  const [pendingSource, setPendingSource] = useState<string | null>(null)
 
   // ── Keyboard shortcuts for mode switching ─────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const m = KEY_MODE_MAP[e.key.toLowerCase()]
-      if (m) runInAction(() => uiStore.setCanvasMode(m))
+      if (m) { runInAction(() => uiStore.setCanvasMode(m)); setPendingSource(null) }
+      if (e.key === 'Escape') setPendingSource(null)
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -174,11 +177,12 @@ const CanvasPanel = observer(() => {
       }
 
       runInAction(() => { graphStore.selectNode(null); graphStore.selectEdge(null) })
+      setPendingSource(null)
     },
     [mode, screenToFlowPosition],
   )
 
-  // ── Node click — eraser mode ──────────────────────────────────────────────
+  // ── Node click — select, connect, or eraser ──────────────────────────────
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (mode === 'eraser') {
@@ -186,9 +190,23 @@ const CanvasPanel = observer(() => {
           if (graphStore.structuralNodes.has(node.id)) graphStore.removeStructuralNode(node.id)
           else graphStore.removeNode(node.id)
         })
+      } else if (mode === 'connect') {
+        if (!pendingSource) {
+          // First click — mark as source
+          setPendingSource(node.id)
+        } else if (pendingSource === node.id) {
+          // Clicked same node — cancel
+          setPendingSource(null)
+        } else {
+          // Second click — create edge
+          runInAction(() => graphStore.connectNodes(pendingSource, node.id))
+          setPendingSource(null)
+        }
+      } else {
+        runInAction(() => graphStore.selectNode(node.id))
       }
     },
-    [mode],
+    [mode, pendingSource],
   )
 
   const onEdgeClick = useCallback(
@@ -248,7 +266,12 @@ const CanvasPanel = observer(() => {
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="flex items-center gap-2 bg-app-elevated border border-app-accent/40 rounded-lg px-3 py-1.5 shadow-md">
             <span className="w-1.5 h-1.5 rounded-full bg-app-accent animate-pulse shrink-0" />
-            <span className="text-xs text-app-text-2">Click a source node, then a destination to connect them</span>
+            {pendingSource
+              ? <span className="text-xs text-app-text-2">
+                  Source: <span className="text-white font-medium">{graphStore.nodes.get(pendingSource)?.label ?? pendingSource}</span> — now click or drag to a destination
+                </span>
+              : <span className="text-xs text-app-text-2">Click or drag a source node to start a connection</span>
+            }
           </div>
         </div>
       )}

@@ -15,7 +15,7 @@ interface Tool {
 const TOOLS: Tool[] = [
   { mode: 'select',    icon: MousePointer2, label: 'Select',    shortcut: 'V' },
   { mode: 'hand',      icon: Hand,          label: 'Pan',       shortcut: 'H' },
-  { mode: 'connect',   icon: ArrowUpRight,  label: 'Connect',   shortcut: 'C' },
+  { mode: 'connect',   icon: ArrowUpRight,  label: 'Connect — click or drag', shortcut: 'C' },
   { mode: 'container', icon: Square,        label: 'Container', shortcut: 'B' },
   { mode: 'text',      icon: Type,          label: 'Text',      shortcut: 'T' },
   { mode: 'eraser',    icon: Eraser,        label: 'Eraser',    shortcut: 'E' },
