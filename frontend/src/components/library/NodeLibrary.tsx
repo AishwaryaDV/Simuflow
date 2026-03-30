@@ -35,7 +35,14 @@ function SimNodeCard({ nodeType, onTip }: {
   const onDragStart = useCallback((e: React.DragEvent) => {
     e.dataTransfer.setData('application/simuflow-node-type', nodeType)
     e.dataTransfer.effectAllowed = 'copy'
-  }, [nodeType])
+    // Clean drag ghost — just icon + label in a small pill
+    const ghost = document.createElement('div')
+    ghost.style.cssText = 'position:fixed;top:-200px;left:-200px;background:#1e1e2e;border:1px solid #3a3a5c;border-radius:8px;padding:6px 10px;color:#fff;font-size:11px;font-family:sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap;'
+    ghost.textContent = display.label
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2)
+    requestAnimationFrame(() => document.body.removeChild(ghost))
+  }, [nodeType, display.label])
 
   return (
     <div
@@ -67,7 +74,13 @@ function StructuralCard({ structuralType, onTip }: {
   const onDragStart = useCallback((e: React.DragEvent) => {
     e.dataTransfer.setData('application/simuflow-structural-type', structuralType)
     e.dataTransfer.effectAllowed = 'copy'
-  }, [structuralType])
+    const ghost = document.createElement('div')
+    ghost.style.cssText = 'position:fixed;top:-200px;left:-200px;background:#1e1e2e;border:1px dashed #3a3a5c;border-radius:8px;padding:6px 10px;color:#aaa;font-size:11px;font-family:sans-serif;white-space:nowrap;'
+    ghost.textContent = display.label
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2)
+    requestAnimationFrame(() => document.body.removeChild(ghost))
+  }, [structuralType, display.label])
 
   return (
     <div
