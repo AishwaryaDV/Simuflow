@@ -450,12 +450,35 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     ? allStates.reduce((s, n) => s + n.errorRate, 0) / allStates.length
     : 0
 
+  // Latency — sum configured latency across all non-client nodes weighted by utilisation
+  // p95/p99 are modelled as multiples of p50 that grow with utilisation (queueing theory)
+  const nonClientStates = allStates.filter(s => {
+    const n = simNodes.find(n => n.id === s.nodeId)
+    return n && n.nodeType !== NodeType.Client
+  })
+  const p50 = nonClientStates.reduce((sum, s) => {
+    const n = simNodes.find(n => n.id === s.nodeId)
+    if (!n) return sum
+    const cfg = n.config as BaseNodeConfig
+    const baseMs = (cfg as any).latencyMs ?? (cfg as any).warmLatencyMs ?? (cfg as any).queryLatencyMs ?? 10
+    // Under load, latency grows: at 100% util it doubles
+    const loadFactor = 1 + Math.max(0, s.utilisationPct / 100)
+    return sum + baseMs * loadFactor
+  }, 0)
+  // p95 and p99 diverge more as system gets stressed
+  const avgUtil = nonClientStates.length
+    ? nonClientStates.reduce((s, n) => s + n.utilisationPct, 0) / nonClientStates.length
+    : 0
+  const tailMultiplier = 1 + (avgUtil / 100) * 3  // at 100% util: p95 = 4× p50
+  const p95 = p50 * (1 + tailMultiplier * 0.5)
+  const p99 = p50 * (1 + tailMultiplier)
+
   const globalMetrics: MetricSnapshot = {
     timestamp:    Date.now(),
     throughput:   totalRps,
-    p50LatencyMs: 0,
-    p95LatencyMs: 0,
-    p99LatencyMs: 0,
+    p50LatencyMs: Math.round(p50),
+    p95LatencyMs: Math.round(p95),
+    p99LatencyMs: Math.round(p99),
     errorRate:    avgErr,
     totalRequests: tick * totalRps * TICK_SECS,
   }

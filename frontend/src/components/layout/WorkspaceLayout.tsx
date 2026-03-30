@@ -4,6 +4,8 @@ import NodeLibrary from '../library/NodeLibrary'
 import CanvasPanel from '../canvas/CanvasPanel'
 import ConfigPanel from '../panels/ConfigPanel'
 import EdgeConfigPanel from '../canvas/EdgeConfigPanel'
+import SimulationHUD from '../canvas/SimulationHUD'
+import MetricsPanel from '../panels/MetricsPanel'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 
@@ -31,10 +33,14 @@ export default function WorkspaceLayout() {
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <NodeLibrary />
-          <main className="flex-1 overflow-hidden relative">
-            <CanvasPanel />
-            <EdgeConfigPanel />
-          </main>
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <main className="flex-1 overflow-hidden relative">
+              <CanvasPanel />
+              <EdgeConfigPanel />
+              <SimulationHUD />
+            </main>
+            <MetricsPanel />
+          </div>
           <ConfigPanel />
         </div>
       </div>
