@@ -82,6 +82,16 @@ export enum RejectBehavior {
   Queue = "queue",  // hold until a slot is available (adds latency)
 }
 
+export enum EdgeProtocol {
+  HTTP      = "http",
+  HTTPS     = "https",
+  GRPC      = "grpc",
+  WebSocket = "websocket",
+  TCP       = "tcp",
+  UDP       = "udp",
+  Custom    = "custom",
+}
+
 export enum NodeHealth {
   Idle       = "idle",       // simulation not running
   Healthy    = "healthy",    // utilisation < 60%
@@ -368,8 +378,18 @@ export interface SimEdge {
   id: string;
   sourceId: string;
   targetId: string;
-  /** Optional label shown on edge at idle — e.g. "SQL queries" */
+  /** Optional label shown on edge — e.g. "SQL queries" */
   label?: string;
+  /** Transport protocol for this connection. */
+  protocol?: EdgeProtocol;
+  /** Max requests/sec allowed on this edge. 0 = unlimited. Used by Phase 3 constraint solver. */
+  bandwidthRps?: number;
+  /** Fixed latency overhead added to every request on this edge in ms. */
+  latencyMs?: number;
+  /** Relative traffic weight when multiple edges leave the same node. Default 1 = equal share. */
+  weight?: number;
+  /** If true, traffic flows in both directions (e.g. WebSocket, bidirectional gRPC). */
+  bidirectional?: boolean;
 }
 
 export interface TopologySchema {

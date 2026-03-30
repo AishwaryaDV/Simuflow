@@ -3,7 +3,9 @@ import Toolbar from '../panels/Toolbar'
 import NodeLibrary from '../library/NodeLibrary'
 import CanvasPanel from '../canvas/CanvasPanel'
 import ConfigPanel from '../panels/ConfigPanel'
+import EdgeConfigPanel from '../canvas/EdgeConfigPanel'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
+import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 
 /**
  * 5-zone workspace shell:
@@ -21,6 +23,7 @@ import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersisten
  */
 export default function WorkspaceLayout() {
   useLocalStoragePersistence()
+  useWorkerBridge()
 
   return (
     <ReactFlowProvider>
@@ -28,8 +31,9 @@ export default function WorkspaceLayout() {
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <NodeLibrary />
-          <main className="flex-1 overflow-hidden">
+          <main className="flex-1 overflow-hidden relative">
             <CanvasPanel />
+            <EdgeConfigPanel />
           </main>
           <ConfigPanel />
         </div>
