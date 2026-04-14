@@ -1,22 +1,24 @@
 import { makeObservable, observable, action } from 'mobx'
 
-type ActiveModal = 'share' | 'preset' | 'settings' | null
+type ActiveModal = 'share' | 'settings' | null
 
 interface PanelState {
-  left:   boolean
-  right:  boolean
-  bottom: boolean
-  chaos:  boolean
+  left:      boolean
+  right:     boolean
+  bottom:    boolean
+  chaos:     boolean
+  templates: boolean
 }
 
 export type CanvasMode = 'select' | 'hand' | 'connect' | 'text' | 'eraser' | 'container'
 
 class UIStore {
   panelState: PanelState = {
-    left:   true,
-    right:  false,
-    bottom: false,
-    chaos:  false,
+    left:      true,
+    right:     false,
+    bottom:    false,
+    chaos:     false,
+    templates: false,
   }
   activeModal:        ActiveModal    = null
   theme:              'dark' | 'light' = 'light'

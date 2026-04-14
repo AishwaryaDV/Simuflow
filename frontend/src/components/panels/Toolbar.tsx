@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
 import { simulationStore } from '../../stores/SimulationStore'
+import { uiStore } from '../../stores/UIStore'
 import { SimulationStatus } from '../../types/topology'
 import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown } from 'lucide-react'
-import TemplatesModal from '../modals/TemplatesModal'
 
 const SPEEDS: { label: string; value: 0.25 | 0.5 | 1 | 2 | 4 }[] = [
   { label: '0.25×', value: 0.25 },
@@ -25,7 +25,6 @@ const Toolbar = observer(() => {
   const { status, elapsedSeconds, speed, isRunning } = simulationStore
   const isIdle   = status === SimulationStatus.Idle
   const isPaused = status === SimulationStatus.Paused
-  const [showTemplates, setShowTemplates] = useState(false)
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     runInAction(() => graphStore.setName(e.target.value))
@@ -149,15 +148,18 @@ const Toolbar = observer(() => {
 
       {/* Templates */}
       <button
-        onClick={() => setShowTemplates(true)}
-        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-app-border text-app-text-2 hover:border-app-accent/60 hover:text-app-text transition-colors"
-        title="Load a template"
+        onClick={() => runInAction(() => uiStore.togglePanel('templates'))}
+        className={[
+          'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors',
+          uiStore.panelState.templates
+            ? 'border-app-accent/60 text-app-accent bg-app-accent/10'
+            : 'border-app-border text-app-text-2 hover:border-app-accent/60 hover:text-app-text',
+        ].join(' ')}
+        title="Browse templates"
       >
         <LayoutTemplate size={13} strokeWidth={1.8} />
         <span className="hidden sm:inline">Templates</span>
       </button>
-
-      {showTemplates && <TemplatesModal onClose={() => setShowTemplates(false)} />}
 
       {/* Reset */}
       <button

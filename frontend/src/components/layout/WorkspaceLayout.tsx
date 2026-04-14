@@ -1,4 +1,5 @@
 import { ReactFlowProvider } from '@xyflow/react'
+import { observer } from 'mobx-react-lite'
 import Toolbar from '../panels/Toolbar'
 import NodeLibrary from '../library/NodeLibrary'
 import CanvasPanel from '../canvas/CanvasPanel'
@@ -6,8 +7,10 @@ import ConfigPanel from '../panels/ConfigPanel'
 import EdgeConfigPanel from '../canvas/EdgeConfigPanel'
 import SimulationHUD from '../canvas/SimulationHUD'
 import MetricsPanel from '../panels/MetricsPanel'
+import TemplatesSidebar from '../panels/TemplatesSidebar'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
+import { uiStore } from '../../stores/UIStore'
 
 /**
  * 5-zone workspace shell:
@@ -23,7 +26,7 @@ import { useWorkerBridge } from '../../hooks/useWorkerBridge'
  * ReactFlowProvider wraps everything so CanvasPanel and
  * any child that calls useReactFlow() share the same instance.
  */
-export default function WorkspaceLayout() {
+const WorkspaceLayout = observer(function WorkspaceLayout() {
   useLocalStoragePersistence()
   useWorkerBridge()
 
@@ -41,9 +44,14 @@ export default function WorkspaceLayout() {
             </main>
             <MetricsPanel />
           </div>
-          <ConfigPanel />
+          {uiStore.panelState.templates
+            ? <TemplatesSidebar />
+            : <ConfigPanel />
+          }
         </div>
       </div>
     </ReactFlowProvider>
   )
-}
+})
+
+export default WorkspaceLayout
