@@ -1,7 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
-import { X, Lightbulb, Lock, Play, Trash2, ChevronLeft, Loader2 } from 'lucide-react'
+import {
+  X, Lightbulb, Lock, Trash2, ChevronLeft, Loader2, LayoutTemplate,
+  Globe, Zap, Link2, Users, Film, Navigation2, BarChart3, Bot,
+  LayoutGrid, ArrowRight,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
 import { simulationStore } from '../../stores/SimulationStore'
 import { uiStore } from '../../stores/UIStore'
@@ -14,81 +19,75 @@ import {
   type TemplateCategory,
 } from '../../templates/index'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Icon + colour maps ────────────────────────────────────────────────────────
+
+const TEMPLATE_ICONS: Record<string, LucideIcon> = {
+  blank:          LayoutGrid,
+  web_app:        Globe,
+  cached_web_app: Zap,
+  url_shortener:  Link2,
+  social_feed:    Users,
+  video_streaming:Film,
+  ride_sharing:   Navigation2,
+  data_analytics: BarChart3,
+  ai_agent:       Bot,
+}
+
+const ICON_STYLE = 'text-app-accent bg-app-accent/10'
 
 const CATEGORY_ORDER: TemplateCategory[] = ['fundamentals', 'distributed', 'data', 'ai']
-
-const CATEGORY_ACCENT: Record<TemplateCategory, { pill: string; dot: string }> = {
-  fundamentals: { pill: 'text-blue-400 border-blue-500/30 bg-blue-500/10',    dot: 'bg-blue-400'    },
-  distributed:  { pill: 'text-purple-400 border-purple-500/30 bg-purple-500/10', dot: 'bg-purple-400' },
-  data:         { pill: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', dot: 'bg-emerald-400' },
-  ai:           { pill: 'text-orange-400 border-orange-500/30 bg-orange-500/10', dot: 'bg-orange-400'  },
-}
 
 // ── Template card ──────────────────────────────────────────────────────────────
 
 interface CardProps {
-  template:      Template
-  isLoaded:      boolean
-  isLoading:     boolean
-  onLoad:        (t: Template) => void
-  onShowDetails: (t: Template) => void
+  template:  Template
+  isLoading: boolean
+  onLoad:    (t: Template) => void
 }
 
-function TemplateCard({ template, isLoaded, isLoading, onLoad, onShowDetails }: CardProps) {
-  const isReady    = template.slug === 'blank' || template.topology !== null
-  const hasDetails = template.details !== null
-  const accent     = CATEGORY_ACCENT[template.category]
+function TemplateCard({ template, isLoading, onLoad }: CardProps) {
+  const isReady = template.slug === 'blank' || template.topology !== null
+  const Icon    = TEMPLATE_ICONS[template.slug] ?? Globe
 
   return (
-    <div
-      className={[
-        'group relative flex items-start gap-3 px-4 py-3 border-b border-app-border/50 transition-colors',
-        isReady  ? 'hover:bg-app-elevated cursor-pointer' : 'opacity-50 cursor-not-allowed',
-        isLoaded ? 'bg-app-accent/5 border-l-2 border-l-app-accent'  : '',
-      ].join(' ')}
-      onClick={() => isReady && !isLoading && onLoad(template)}
-    >
-      {/* Category dot */}
-      <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${accent.dot}`} />
+    <div className={[
+      'rounded-xl border p-3 flex flex-col gap-2 transition-colors',
+      isReady
+        ? 'border-app-border bg-app-elevated hover:border-app-accent/40'
+        : 'border-app-border/40 bg-app-elevated/50 opacity-55',
+    ].join(' ')}>
 
-      {/* Text */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-xs font-semibold text-app-text truncate leading-tight">
-            {template.name}
-          </span>
-          {isLoaded && (
-            <span className="shrink-0 text-[9px] font-bold text-app-accent bg-app-accent/15 border border-app-accent/30 rounded-full px-1.5 py-px">
-              LOADED
-            </span>
-          )}
-          {!isReady && (
-            <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-medium text-app-text-3 border border-app-border/60 rounded-full px-1.5 py-px">
-              <Lock size={7} />
-              Soon
-            </span>
-          )}
+      {/* Top row: icon + name + load button */}
+      <div className="flex items-center gap-2">
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${ICON_STYLE}`}>
+          <Icon size={14} strokeWidth={1.8} />
         </div>
-        <p className="text-[11px] text-app-text-2 leading-relaxed line-clamp-2">
-          {template.description}
+        <p className="text-xs font-semibold text-white leading-snug flex-1 min-w-0">
+          {template.name}
         </p>
-      </div>
-
-      {/* Right actions */}
-      <div className="shrink-0 flex items-center gap-1 mt-0.5">
-        {isLoading && <Loader2 size={13} className="text-app-accent animate-spin" />}
-
-        {hasDetails && isReady && !isLoading && (
+        {isReady ? (
           <button
-            onClick={e => { e.stopPropagation(); onShowDetails(template) }}
-            className="p-1 rounded text-app-text-3 hover:text-yellow-400 hover:bg-yellow-400/10 transition-colors"
-            title="Design explanation"
+            onClick={() => !isLoading && onLoad(template)}
+            disabled={isLoading}
+            className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-app-accent hover:text-white hover:bg-app-accent px-2 py-1 rounded-lg border border-app-accent/40 hover:border-app-accent transition-colors disabled:opacity-50"
           >
-            <Lightbulb size={13} />
+            {isLoading
+              ? <Loader2 size={11} className="animate-spin" />
+              : <ArrowRight size={11} />
+            }
           </button>
+        ) : (
+          <span className="shrink-0 flex items-center gap-1 text-[10px] font-medium text-app-text-3 border border-app-border/50 rounded-full px-2 py-0.5">
+            <Lock size={8} />
+            Soon
+          </span>
         )}
       </div>
+
+      {/* Description — full, no truncation */}
+      <p className="text-[11px] text-app-text-2 leading-relaxed">
+        {template.description}
+      </p>
     </div>
   )
 }
@@ -97,18 +96,23 @@ function TemplateCard({ template, isLoaded, isLoading, onLoad, onShowDetails }: 
 
 function DetailsView({ template, onBack }: { template: Template; onBack: () => void }) {
   const d = template.details!
+  const Icon = TEMPLATE_ICONS[template.slug] ?? Globe
+
   return (
     <div className="flex flex-col h-full">
-      {/* Back header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-app-border shrink-0">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-app-border shrink-0">
         <button
           onClick={onBack}
-          className="p-1 rounded text-app-text-3 hover:text-app-text hover:bg-app-elevated transition-colors"
+          className="p-1 rounded text-app-text-3 hover:text-app-text hover:bg-app-elevated transition-colors shrink-0"
         >
           <ChevronLeft size={14} />
         </button>
-        <Lightbulb size={13} className="text-yellow-400" />
-        <span className="text-xs font-semibold text-app-text truncate">{template.name}</span>
+        <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${ICON_STYLE}`}>
+          <Icon size={12} strokeWidth={2} />
+        </div>
+        <span className="text-xs font-semibold text-white truncate">{template.name}</span>
+        <Lightbulb size={12} className="text-yellow-400 shrink-0 ml-auto" />
       </div>
 
       {/* Scrollable content */}
@@ -121,11 +125,11 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
 
         <section>
           <h4 className="text-[10px] font-bold text-app-text-3 uppercase tracking-wider mb-2">Key Components</h4>
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {d.components.map(c => (
-              <li key={c.name} className="flex gap-2">
-                <span className="font-semibold text-app-text shrink-0">{c.name}</span>
-                <span className="text-app-text-2">— {c.role}</span>
+              <li key={c.name}>
+                <span className="font-semibold text-app-text">{c.name}</span>
+                <span className="text-app-text-2"> — {c.role}</span>
               </li>
             ))}
           </ul>
@@ -136,7 +140,7 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
           <ul className="space-y-1.5">
             {d.watchFor.map((w, i) => (
               <li key={i} className="flex gap-2 leading-relaxed">
-                <span className="text-app-accent shrink-0">•</span>
+                <span className="text-app-accent shrink-0 mt-px">•</span>
                 <span>{w}</span>
               </li>
             ))}
@@ -145,7 +149,7 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
 
         <section>
           <h4 className="text-[10px] font-bold text-app-text-3 uppercase tracking-wider mb-2">Try This</h4>
-          <p className="leading-relaxed text-app-text-2 italic border-l-2 border-app-accent/40 pl-3">
+          <p className="leading-relaxed italic border-l-2 border-app-accent/40 pl-3">
             {d.tryThis}
           </p>
         </section>
@@ -158,16 +162,23 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
 // ── Main sidebar ───────────────────────────────────────────────────────────────
 
 const TemplatesSidebar = observer(() => {
-  const [loadingSlug,    setLoadingSlug]    = useState<string | null>(null)
-  const [loadedTemplate, setLoadedTemplate] = useState<Template | null>(null)
-  const [detailsFor,     setDetailsFor]     = useState<Template | null>(null)
+  const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
+  const [detailsFor,  setDetailsFor]  = useState<Template | null>(null)
 
   const isSimRunning = simulationStore.status !== SimulationStatus.Idle
+
+  // When sidebar opens and a template is already loaded, jump straight to its details
+  useEffect(() => {
+    if (uiStore.loadedTemplateSlug) {
+      const t = TEMPLATES.find(t => t.slug === uiStore.loadedTemplateSlug)
+      if (t?.details) setDetailsFor(t)
+    }
+  }, [])
 
   const handleLoad = useCallback((template: Template) => {
     if (loadingSlug) return
 
-    const hasContent = graphStore.nodeCount > 0 && loadedTemplate?.slug !== template.slug
+    const hasContent = graphStore.nodeCount > 0
     if (hasContent) {
       const ok = confirm(`Load "${template.name}"? Your current canvas will be replaced.`)
       if (!ok) return
@@ -186,16 +197,19 @@ const TemplatesSidebar = observer(() => {
           graphStore.loadTopology(template.topology, undefined, template.name)
         }
       })
-      setLoadingSlug(null)
-      setLoadedTemplate(template)
-      setDetailsFor(null)
-    }, 450)
-  }, [loadingSlug, loadedTemplate, isSimRunning])
 
-  const handleSimulate = useCallback(() => {
-    runInAction(() => simulationStore.start())
-    runInAction(() => uiStore.closePanel('templates'))
-  }, [])
+      setLoadingSlug(null)
+
+      if (template.slug === 'blank') {
+        runInAction(() => { uiStore.setTemplateMode(false); uiStore.closePanel('templates') })
+      } else if (template.details) {
+        runInAction(() => uiStore.setTemplateMode(true, template.slug))
+        setDetailsFor(template)
+      } else {
+        runInAction(() => { uiStore.setTemplateMode(true, template.slug); uiStore.closePanel('templates') })
+      }
+    }, 450)
+  }, [loadingSlug, isSimRunning])
 
   const handleClearCanvas = useCallback(() => {
     if (graphStore.nodeCount === 0) return
@@ -203,8 +217,9 @@ const TemplatesSidebar = observer(() => {
     runInAction(() => {
       if (isSimRunning) simulationStore.stop()
       graphStore.clearCanvas()
+      uiStore.setTemplateMode(false)
     })
-    setLoadedTemplate(null)
+    setDetailsFor(null)
   }, [isSimRunning])
 
   const handleClose = useCallback(() => {
@@ -216,14 +231,14 @@ const TemplatesSidebar = observer(() => {
   return (
     <aside className="w-72 h-full flex flex-col bg-app-surface border-l border-app-border shrink-0 overflow-hidden">
 
-      {/* Show details view if a bulb was clicked */}
       {detailsFor ? (
         <DetailsView template={detailsFor} onBack={() => setDetailsFor(null)} />
       ) : (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-app-border shrink-0">
-            <span className="text-xs font-semibold text-app-text">Templates</span>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-app-border shrink-0">
+            <LayoutTemplate size={14} className="text-app-accent shrink-0" />
+            <span className="text-xs font-semibold text-white flex-1">Templates</span>
             <button
               onClick={handleClose}
               className="p-1 rounded text-app-text-3 hover:text-app-text hover:bg-app-elevated transition-colors"
@@ -233,47 +248,32 @@ const TemplatesSidebar = observer(() => {
           </div>
 
           {/* Template list — scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
             {CATEGORY_ORDER.map(category => {
               const templates = TEMPLATES_BY_CATEGORY[category]
               if (!templates.length) return null
               return (
-                <div key={category}>
-                  <div className="px-4 py-2 sticky top-0 bg-app-surface z-10">
-                    <span className="text-[10px] font-bold text-app-text-3 uppercase tracking-wider">
-                      {CATEGORY_LABELS[category]}
-                    </span>
+                <section key={category}>
+                  <p className="text-[10px] font-bold text-app-text-3 uppercase tracking-wider mb-2 px-1">
+                    {CATEGORY_LABELS[category]}
+                  </p>
+                  <div className="space-y-2">
+                    {templates.map(t => (
+                      <TemplateCard
+                        key={t.slug}
+                        template={t}
+                        isLoading={loadingSlug === t.slug}
+                        onLoad={handleLoad}
+                      />
+                    ))}
                   </div>
-                  {templates.map(t => (
-                    <TemplateCard
-                      key={t.slug}
-                      template={t}
-                      isLoaded={loadedTemplate?.slug === t.slug}
-                      isLoading={loadingSlug === t.slug}
-                      onLoad={handleLoad}
-                      onShowDetails={setDetailsFor}
-                    />
-                  ))}
-                </div>
+                </section>
               )
             })}
           </div>
 
           {/* Footer */}
-          <div className="shrink-0 border-t border-app-border p-3 space-y-2">
-
-            {/* Simulate button — only when a template (non-blank) is loaded */}
-            {loadedTemplate && loadedTemplate.slug !== 'blank' && !isSimRunning && (
-              <button
-                onClick={handleSimulate}
-                className="w-full flex items-center justify-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white transition-colors"
-              >
-                <Play size={12} strokeWidth={2.5} />
-                Simulate {loadedTemplate.name}
-              </button>
-            )}
-
-            {/* Clear canvas */}
+          <div className="shrink-0 border-t border-app-border p-3">
             <button
               onClick={handleClearCanvas}
               disabled={graphStore.nodeCount === 0}

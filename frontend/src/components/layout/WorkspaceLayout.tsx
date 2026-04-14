@@ -8,6 +8,7 @@ import EdgeConfigPanel from '../canvas/EdgeConfigPanel'
 import SimulationHUD from '../canvas/SimulationHUD'
 import MetricsPanel from '../panels/MetricsPanel'
 import TemplatesSidebar from '../panels/TemplatesSidebar'
+import TemplateBadge from '../canvas/TemplateBadge'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
@@ -40,13 +41,14 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
             <main className="flex-1 overflow-hidden relative">
               <CanvasPanel />
               <EdgeConfigPanel />
+              <TemplateBadge />
               <SimulationHUD />
             </main>
             <MetricsPanel />
           </div>
           {uiStore.panelState.templates
             ? <TemplatesSidebar />
-            : <ConfigPanel />
+            : !uiStore.templateMode && <ConfigPanel />
           }
         </div>
       </div>

@@ -24,6 +24,8 @@ class UIStore {
   theme:              'dark' | 'light' = 'light'
   onboardingComplete: boolean        = false
   canvasMode:         CanvasMode     = 'select'
+  templateMode:        boolean        = false
+  loadedTemplateSlug:  string | null  = null
 
   constructor() {
     makeObservable(this, {
@@ -32,6 +34,8 @@ class UIStore {
       theme:              observable,
       onboardingComplete: observable,
       canvasMode:         observable,
+      templateMode:        observable,
+      loadedTemplateSlug:  observable,
       togglePanel:        action,
       openPanel:          action,
       closePanel:         action,
@@ -40,6 +44,7 @@ class UIStore {
       setTheme:           action,
       completeOnboarding: action,
       setCanvasMode:      action,
+      setTemplateMode:    action,
     })
   }
 
@@ -73,6 +78,11 @@ class UIStore {
 
   setCanvasMode(mode: CanvasMode) {
     this.canvasMode = mode
+  }
+
+  setTemplateMode(active: boolean, slug?: string) {
+    this.templateMode       = active
+    this.loadedTemplateSlug = active ? (slug ?? null) : null
   }
 }
 

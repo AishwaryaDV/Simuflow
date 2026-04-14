@@ -13,22 +13,19 @@ export function useLocalStoragePersistence() {
     if (!raw) return
     try {
       const topology: TopologySchema = JSON.parse(raw)
-      // Basic sanity check before loading
       if (Array.isArray(topology.nodes) && Array.isArray(topology.edges)) {
         graphStore.loadTopology(topology)
       }
     } catch {
-      // Corrupt data — ignore and start fresh
       localStorage.removeItem(STORAGE_KEY)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Persist on every topology mutation (MobX autorun tracks graphStore.topology computed)
+  // Persist on every topology mutation
   useEffect(() => {
     const dispose = autorun(() => {
-      const snapshot = JSON.stringify(graphStore.topology)
-      localStorage.setItem(STORAGE_KEY, snapshot)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(graphStore.topology))
     })
     return dispose
   }, [])
