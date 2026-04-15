@@ -1,4 +1,4 @@
-import { makeObservable, observable, action } from 'mobx'
+import { makeObservable, observable, computed, action } from 'mobx'
 
 type ActiveModal = 'share' | 'settings' | null
 
@@ -12,20 +12,26 @@ interface PanelState {
 
 export type CanvasMode = 'select' | 'hand' | 'connect' | 'text' | 'eraser' | 'container'
 
+// Read once synchronously so first render already has the right values — no flash.
+const _persistedSlug = (() => {
+  try { return localStorage.getItem('simuflow:template-slug') } catch { return null }
+})()
+
 class UIStore {
   panelState: PanelState = {
     left:      true,
     right:     false,
     bottom:    false,
     chaos:     false,
-    templates: false,
+    // Auto-open sidebar on reload if a template was previously loaded
+    templates: _persistedSlug !== null,
   }
   activeModal:        ActiveModal    = null
   theme:              'dark' | 'light' = 'light'
   onboardingComplete: boolean        = false
   canvasMode:         CanvasMode     = 'select'
-  templateMode:        boolean        = false
-  loadedTemplateSlug:  string | null  = null
+  loadedTemplateSlug:   string | null  = _persistedSlug
+  templateDetailsOpen:  boolean        = _persistedSlug !== null
 
   constructor() {
     makeObservable(this, {
@@ -33,9 +39,10 @@ class UIStore {
       activeModal:        observable,
       theme:              observable,
       onboardingComplete: observable,
-      canvasMode:         observable,
-      templateMode:        observable,
-      loadedTemplateSlug:  observable,
+      canvasMode:          observable,
+      loadedTemplateSlug:   observable,
+      templateDetailsOpen:  observable,
+      templateMode:         computed,
       togglePanel:        action,
       openPanel:          action,
       closePanel:         action,
@@ -43,8 +50,10 @@ class UIStore {
       closeModal:         action,
       setTheme:           action,
       completeOnboarding: action,
-      setCanvasMode:      action,
-      setTemplateMode:    action,
+      setCanvasMode:       action,
+      setLoadedTemplate:    action,
+      openTemplateDetails:  action,
+      closeTemplateDetails: action,
     })
   }
 
@@ -76,13 +85,26 @@ class UIStore {
     this.onboardingComplete = true
   }
 
+  get templateMode(): boolean {
+    return this.loadedTemplateSlug !== null
+  }
+
   setCanvasMode(mode: CanvasMode) {
     this.canvasMode = mode
   }
 
-  setTemplateMode(active: boolean, slug?: string) {
-    this.templateMode       = active
-    this.loadedTemplateSlug = active ? (slug ?? null) : null
+  setLoadedTemplate(slug: string | null) {
+    this.loadedTemplateSlug  = slug
+    this.templateDetailsOpen = slug !== null
+  }
+
+  openTemplateDetails() {
+    this.templateDetailsOpen = true
+    this.panelState.templates = true
+  }
+
+  closeTemplateDetails() {
+    this.templateDetailsOpen = false
   }
 }
 

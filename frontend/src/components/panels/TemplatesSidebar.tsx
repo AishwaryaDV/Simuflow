@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import {
@@ -72,8 +72,8 @@ function TemplateCard({ template, isLoading, onLoad }: CardProps) {
             className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-app-accent hover:text-white hover:bg-app-accent px-2 py-1 rounded-lg border border-app-accent/40 hover:border-app-accent transition-colors disabled:opacity-50"
           >
             {isLoading
-              ? <Loader2 size={11} className="animate-spin" />
-              : <ArrowRight size={11} />
+              ? <><Loader2 size={11} className="animate-spin" /> Loading</>
+              : <><ArrowRight size={11} /> Load</>
             }
           </button>
         ) : (
@@ -163,17 +163,13 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
 
 const TemplatesSidebar = observer(() => {
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
-  const [detailsFor,  setDetailsFor]  = useState<Template | null>(null)
 
   const isSimRunning = simulationStore.status !== SimulationStatus.Idle
 
-  // When sidebar opens and a template is already loaded, jump straight to its details
-  useEffect(() => {
-    if (uiStore.loadedTemplateSlug) {
-      const t = TEMPLATES.find(t => t.slug === uiStore.loadedTemplateSlug)
-      if (t?.details) setDetailsFor(t)
-    }
-  }, [])
+  // Derive details view from UIStore — so the bulb badge can drive it from outside
+  const detailsFor = uiStore.templateDetailsOpen && uiStore.loadedTemplateSlug
+    ? (TEMPLATES.find(t => t.slug === uiStore.loadedTemplateSlug) ?? null)
+    : null
 
   const handleLoad = useCallback((template: Template) => {
     if (loadingSlug) return
@@ -201,12 +197,15 @@ const TemplatesSidebar = observer(() => {
       setLoadingSlug(null)
 
       if (template.slug === 'blank') {
-        runInAction(() => { uiStore.setTemplateMode(false); uiStore.closePanel('templates') })
+        localStorage.removeItem('simuflow:template-slug')
+        runInAction(() => { uiStore.setLoadedTemplate(null); uiStore.closePanel('templates') })
       } else if (template.details) {
-        runInAction(() => uiStore.setTemplateMode(true, template.slug))
-        setDetailsFor(template)
+        localStorage.setItem('simuflow:template-slug', template.slug)
+        runInAction(() => uiStore.setLoadedTemplate(template.slug))
+        // templateDetailsOpen is set to true by setLoadedTemplate
       } else {
-        runInAction(() => { uiStore.setTemplateMode(true, template.slug); uiStore.closePanel('templates') })
+        localStorage.setItem('simuflow:template-slug', template.slug)
+        runInAction(() => { uiStore.setLoadedTemplate(template.slug); uiStore.closePanel('templates') })
       }
     }, 450)
   }, [loadingSlug, isSimRunning])
@@ -214,10 +213,11 @@ const TemplatesSidebar = observer(() => {
   const handleClearCanvas = useCallback(() => {
     if (graphStore.nodeCount === 0) return
     if (!confirm('Clear the canvas? This cannot be undone.')) return
+    localStorage.removeItem('simuflow:template-slug')
     runInAction(() => {
       if (isSimRunning) simulationStore.stop()
       graphStore.clearCanvas()
-      uiStore.setTemplateMode(false)
+      uiStore.setLoadedTemplate(null)   // also resets templateDetailsOpen
     })
     setDetailsFor(null)
   }, [isSimRunning])
@@ -232,7 +232,7 @@ const TemplatesSidebar = observer(() => {
     <aside className="w-72 h-full flex flex-col bg-app-surface border-l border-app-border shrink-0 overflow-hidden">
 
       {detailsFor ? (
-        <DetailsView template={detailsFor} onBack={() => setDetailsFor(null)} />
+        <DetailsView template={detailsFor} onBack={() => runInAction(() => uiStore.closeTemplateDetails())} />
       ) : (
         <>
           {/* Header */}
