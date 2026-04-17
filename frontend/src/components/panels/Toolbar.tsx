@@ -148,12 +148,12 @@ const Toolbar = observer(() => {
 
       {/* Templates */}
       <button
-        onClick={() => runInAction(() => uiStore.togglePanel('templates'))}
+        onClick={() => runInAction(() => uiStore.showTemplatesList())}
         className={[
           'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors',
           uiStore.panelState.templates
-            ? 'border-app-accent/60 text-app-accent bg-app-accent/10'
-            : 'border-app-border text-app-text-2 hover:border-app-accent/60 hover:text-app-text',
+            ? 'border-app-accent/40 text-app-accent bg-app-accent/10'
+            : 'border-app-border/40 text-app-text-2 hover:text-app-text',
         ].join(' ')}
         title="Browse templates"
       >

@@ -54,6 +54,7 @@ class UIStore {
       setLoadedTemplate:    action,
       openTemplateDetails:  action,
       closeTemplateDetails: action,
+      showTemplatesList:    action,
     })
   }
 
@@ -105,6 +106,12 @@ class UIStore {
 
   closeTemplateDetails() {
     this.templateDetailsOpen = false
+  }
+
+  /** Open the templates sidebar and always land on the list view. */
+  showTemplatesList() {
+    this.panelState.templates    = true
+    this.templateDetailsOpen     = false
   }
 }
 

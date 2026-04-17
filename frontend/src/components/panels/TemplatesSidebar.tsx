@@ -69,7 +69,7 @@ function TemplateCard({ template, isLoading, onLoad }: CardProps) {
           <button
             onClick={() => !isLoading && onLoad(template)}
             disabled={isLoading}
-            className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-app-accent hover:text-white hover:bg-app-accent px-2 py-1 rounded-lg border border-app-accent/40 hover:border-app-accent transition-colors disabled:opacity-50"
+            className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-app-accent hover:text-white hover:bg-app-accent px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
           >
             {isLoading
               ? <><Loader2 size={11} className="animate-spin" /> Loading</>
