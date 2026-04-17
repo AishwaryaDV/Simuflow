@@ -6,8 +6,9 @@
 
 import type { TopologySchema } from '../types/topology'
 
-import webApp       from '../presets/web_app.json'
-import cachedWebApp from '../presets/cached_web_app.json'
+import webApp        from '../presets/web_app.json'
+import cachedWebApp  from '../presets/cached_web_app.json'
+import urlShortener  from '../presets/url_shortener.json'
 
 export type TemplateCategory =
   | 'fundamentals'
@@ -110,8 +111,37 @@ export const TEMPLATES: Template[] = [
     name:        'URL Shortener at Scale',
     description: 'High-throughput URL mapping with analytics pipeline and aggressive caching layers.',
     category:    'distributed',
-    topology:    null,
-    details:     null,
+    topology:    urlShortener.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'A URL shortener is deceptively simple on the surface but reveals several classic distributed ' +
+        'systems trade-offs at scale. Reads (redirects) vastly outnumber writes (URL creation), so the ' +
+        'read path is optimised with an in-memory cache achieving ~92% hit rate. A dedicated Key ' +
+        'Generation Service pre-computes short codes to avoid ID collisions under concurrent writes. ' +
+        'Every redirect emits a click event into a stream for async analytics processing.',
+      components: [
+        { name: 'DNS (Route 53)',       role: '300s TTL — most repeat lookups served from client cache, reducing resolver load.' },
+        { name: 'Load Balancer',        role: 'Distributes across redirect and write services. 50,000 RPS capacity.' },
+        { name: 'API Gateway',          role: 'Routes GET /:code to the Redirect Service and POST /shorten to Key Gen.' },
+        { name: 'Redirect Service',     role: 'Hot read path. 15,000 RPS capacity, looks up URL in Redis first.' },
+        { name: 'Key Gen Service',      role: 'Write path only. Generates unique short codes and persists the mapping.' },
+        { name: 'Redis (URL Cache)',     role: '92% hit rate, 1ms latency. Serves the vast majority of redirect lookups.' },
+        { name: 'DynamoDB (URL Store)', role: 'Source of truth for all URL mappings. Separate read/write capacity with ×3 replication.' },
+        { name: 'Click Events Stream',  role: 'Async analytics fan-out. Decouples redirect latency from analytics writes.' },
+        { name: 'Analytics Worker',     role: 'Aggregates click events (geo, referrer, device) and writes to the data lake.' },
+        { name: 'S3 (Analytics Lake)', role: 'Long-term analytics storage. Queried by dashboards, not in the hot path.' },
+      ],
+      watchFor: [
+        'Redis hit rate is the key lever — drop it to 0.5 and watch DynamoDB saturate.',
+        'Key Gen Service is low-throughput by design; at high RPS it becomes the write bottleneck.',
+        'The analytics stream decouples click recording from the redirect latency — worker backpressure does not affect p50.',
+        'DNS TTL means traffic spikes take a few minutes to propagate during incident recovery.',
+      ],
+      tryThis:
+        'Simulate a cache warm-up failure: set Redis hit rate to 0.1 (cold cache after a flush) ' +
+        'and increase Client RPS to 1,000. Watch DynamoDB read utilisation spike to near 100% and ' +
+        'observe how the system degrades. Then restore the hit rate to 0.92 to see recovery.',
+    },
   },
   {
     slug:        'social_feed',
