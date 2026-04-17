@@ -14,6 +14,7 @@ import type {
   QueueConfig, ApiGatewayConfig, ServerlessConfig, WorkerConfig as WorkerNodeConfig,
   PubSubConfig, StreamConfig, RateLimiterConfig, ObjectStoreConfig,
   ExternalServiceConfig, LLMGatewayConfig, VectorDBConfig, AgentOrchestratorConfig,
+  DNSConfig, NoSQLStoreConfig,
 } from '../types/topology'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -255,6 +256,44 @@ export function computeNodeFlow(
       const failed     = failureRoll < cfg.failureRate
       return {
         outRps:         failed ? 0 : Math.min(incomingRps, throughput),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.DNS: {
+      const cfg = node.config as DNSConfig
+      // TTL caching: higher TTL means more queries served from client cache,
+      // reducing effective load on the resolver. cachePct grows with TTL.
+      const cachePct   = Math.min(0.99, 1 - 60 / Math.max(cfg.ttlSeconds, 1))
+      const resolvedRps = incomingRps * (1 - cachePct)
+      // latency benefit from more regions (each doubling regions cuts latency ~20%)
+      const regionFactor = 1 / Math.sqrt(Math.max(cfg.regions, 1))
+      const capacity   = 50_000 * cfg.regions   // DNS resolvers scale horizontally
+      const util       = resolvedRps / capacity
+      const failed     = failureRoll < cfg.failureRate
+      void regionFactor   // used for latency context in metricAggregator
+      return {
+        outRps:         failed ? 0 : incomingRps,  // DNS passes all traffic through
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : 0,
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.NoSQLStore: {
+      const cfg        = node.config as NoSQLStoreConfig
+      // Assume 80% reads, 20% writes (typical workload)
+      const readRps    = incomingRps * 0.8
+      const writeRps   = incomingRps * 0.2 * cfg.replicationFactor  // writes fan out
+      const readUtil   = readRps  / Math.max(cfg.readCapacity, 1)
+      const writeUtil  = writeRps / Math.max(cfg.writeCapacity, 1)
+      const util       = Math.max(readUtil, writeUtil)               // bottleneck dimension
+      const failed     = failureRoll < cfg.failureRate
+      const totalCapacity = cfg.readCapacity + cfg.writeCapacity / cfg.replicationFactor
+      return {
+        outRps:         failed ? 0 : Math.min(incomingRps, totalCapacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,

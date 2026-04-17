@@ -10,7 +10,7 @@ import type {
   BaseNodeConfig, ClientConfig, LoadBalancerConfig, CacheConfig, CDNConfig, QueueConfig,
   ApiGatewayConfig, ServerlessConfig, WorkerConfig, PubSubConfig, StreamConfig,
   RateLimiterConfig, ObjectStoreConfig, ExternalServiceConfig, LLMGatewayConfig,
-  VectorDBConfig, AgentOrchestratorConfig,
+  VectorDBConfig, AgentOrchestratorConfig, DNSConfig, NoSQLStoreConfig,
 } from '../../types/topology'
 import { NODE_DISPLAY, STRUCTURAL_DISPLAY } from '../canvas/nodeConfig'
 import { costStore } from '../../stores/CostStore'
@@ -376,6 +376,47 @@ function AgentOrchestratorFields({ nodeId, cfg }: { nodeId: string; cfg: AgentOr
   )
 }
 
+function DNSFields({ nodeId, cfg }: { nodeId: string; cfg: DNSConfig }) {
+  const patch = (p: Partial<DNSConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="TTL (seconds)" hint="Higher TTL = more client caching = less resolver load">
+          <NumInput value={cfg.ttlSeconds} onChange={v => patch({ ttlSeconds: v })} min={1} step={60} />
+        </Field>
+        <Field label="Regions (PoPs)" hint="More PoPs = lower average resolution latency">
+          <NumInput value={cfg.regions} onChange={v => patch({ regions: v })} min={1} max={32} />
+        </Field>
+        <Field label="Resolution latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={1} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate"><RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} /></Field>
+      </FieldGroup>
+    </>
+  )
+}
+
+function NoSQLStoreFields({ nodeId, cfg }: { nodeId: string; cfg: NoSQLStoreConfig }) {
+  const patch = (p: Partial<NoSQLStoreConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Read capacity (ops/s)"><NumInput value={cfg.readCapacity} onChange={v => patch({ readCapacity: v })} min={1} /></Field>
+        <Field label="Write capacity (ops/s)"><NumInput value={cfg.writeCapacity} onChange={v => patch({ writeCapacity: v })} min={1} /></Field>
+        <Field label="Replication factor" hint="Each write is replicated to N nodes — multiplies write load">
+          <NumInput value={cfg.replicationFactor} onChange={v => patch({ replicationFactor: v })} min={1} max={7} />
+        </Field>
+        <Field label="Read latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={1} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate"><RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} /></Field>
+      </FieldGroup>
+    </>
+  )
+}
+
 // ── Structural node config (label + notes only) ───────────────────────────────
 
 function StructuralFields({ nodeId }: { nodeId: string }) {
@@ -425,6 +466,8 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
     [NodeType.LLMGateway]:        0,
     [NodeType.VectorDB]:          0.096,
     [NodeType.AgentOrchestrator]: 0.500,
+    [NodeType.DNS]:               0.008,
+    [NodeType.NoSQLStore]:        0.095,
   }
   const rate = BASE_HR_HINT[nodeType]
 
@@ -532,6 +575,8 @@ const ConfigPanel = observer(() => {
       case NodeType.LLMGateway:        return <LLMGatewayFields nodeId={nodeId!} cfg={node.config as LLMGatewayConfig} />
       case NodeType.VectorDB:          return <VectorDBFields nodeId={nodeId!} cfg={node.config as VectorDBConfig} />
       case NodeType.AgentOrchestrator: return <AgentOrchestratorFields nodeId={nodeId!} cfg={node.config as AgentOrchestratorConfig} />
+      case NodeType.DNS:               return <DNSFields nodeId={nodeId!} cfg={node.config as DNSConfig} />
+      case NodeType.NoSQLStore:        return <NoSQLStoreFields nodeId={nodeId!} cfg={node.config as NoSQLStoreConfig} />
       default:                         return <BaseFields nodeId={nodeId!} cfg={node.config as BaseNodeConfig} />
     }
   }

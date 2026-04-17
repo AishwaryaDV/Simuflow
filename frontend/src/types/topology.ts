@@ -45,6 +45,10 @@ export enum NodeType {
   LLMGateway        = "llm_gateway",
   VectorDB          = "vector_db",
   AgentOrchestrator = "agent_orchestrator",
+
+  // ── v2.1 additions ───────────────────────────────────────────────────────────
+  DNS               = "dns",
+  NoSQLStore        = "nosql_store",
 }
 
 /** Structural nodes render as containers/regions on the canvas.
@@ -291,6 +295,30 @@ export interface VectorDBConfig {
   failureRate: number;
 }
 
+export interface DNSConfig {
+  /** Time-to-live in seconds — higher TTL = more client-side caching = less resolver load. */
+  ttlSeconds: number;
+  /** Number of geographic PoPs — more regions lowers average resolution latency. */
+  regions: number;
+  /** Base resolution latency for a cache miss in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of resolution failure. */
+  failureRate: number;
+}
+
+export interface NoSQLStoreConfig {
+  /** Max read operations per second. */
+  readCapacity: number;
+  /** Max write operations per second. */
+  writeCapacity: number;
+  /** Number of nodes each write is replicated to — multiplies write load. */
+  replicationFactor: number;
+  /** Base read latency in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of operation failure. */
+  failureRate: number;
+}
+
 export interface AgentOrchestratorConfig {
   /** Max number of agent loops that can run simultaneously. */
   maxConcurrentAgents: number;
@@ -327,7 +355,10 @@ export type NodeConfig =
   | { nodeType: NodeType.ExternalService;   config: ExternalServiceConfig }
   | { nodeType: NodeType.LLMGateway;        config: LLMGatewayConfig }
   | { nodeType: NodeType.VectorDB;          config: VectorDBConfig }
-  | { nodeType: NodeType.AgentOrchestrator; config: AgentOrchestratorConfig };
+  | { nodeType: NodeType.AgentOrchestrator; config: AgentOrchestratorConfig }
+  // v2.1
+  | { nodeType: NodeType.DNS;               config: DNSConfig }
+  | { nodeType: NodeType.NoSQLStore;        config: NoSQLStoreConfig };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STRUCTURAL NODES

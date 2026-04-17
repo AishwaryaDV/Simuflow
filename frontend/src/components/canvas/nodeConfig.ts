@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Monitor, GitBranch, Server, Zap, Database, List, Globe, Box,
   Route, Settings2, Radio, Waves, Gauge, Archive,
-  ExternalLink, Bot, BrainCircuit, Network, Cpu,
+  ExternalLink, Bot, BrainCircuit, Network, Cpu, Layers,
   // Structural
   CloudCog, LayoutGrid, Building2, Map, Shield, GitMerge,
   Flame, ArrowLeftRight, Wrench, Brain, Hexagon, Copy, Type,
@@ -138,6 +138,16 @@ export const NODE_DISPLAY: Record<NodeType, NodeDisplayConfig> = {
     description: 'Third-party dependency — uncontrollable latency variance and failure',
     colorClass: 'bg-gray-900/80', borderClass: 'border-gray-600/70', textClass: 'text-gray-300',
   },
+  [NodeType.DNS]: {
+    label: 'DNS', icon: Globe, category: 'Traffic & Edge',
+    description: 'Domain resolution with TTL-based caching — high TTL reduces resolver load',
+    colorClass: 'bg-cyan-950/60', borderClass: 'border-cyan-700/70', textClass: 'text-cyan-300',
+  },
+  [NodeType.NoSQLStore]: {
+    label: 'NoSQL Store', icon: Layers, category: 'Storage',
+    description: 'Horizontally scalable key-value store — separate read/write capacity, no transactions',
+    colorClass: 'bg-lime-950/60', borderClass: 'border-lime-700/70', textClass: 'text-lime-300',
+  },
 }
 
 // ─── Structural node display ──────────────────────────────────────────────────
@@ -213,6 +223,10 @@ export function createDefaultNode(nodeType: NodeType, position: CanvasPosition):
       return { ...base, nodeType, config: { queryCapacity: 200, indexSizeM: 1, dimensions: 1536, queryLatencyMs: 50, failureRate: 0.005 } }
     case NodeType.AgentOrchestrator:
       return { ...base, nodeType, config: { maxConcurrentAgents: 10, stepLatencyMs: 50, maxSteps: 20, failureRate: 0.05, timeoutMs: 120_000 } }
+    case NodeType.DNS:
+      return { ...base, nodeType, config: { ttlSeconds: 300, regions: 4, latencyMs: 5, failureRate: 0.0001 } }
+    case NodeType.NoSQLStore:
+      return { ...base, nodeType, config: { readCapacity: 5000, writeCapacity: 1000, replicationFactor: 3, latencyMs: 5, failureRate: 0.001 } }
   }
 }
 
