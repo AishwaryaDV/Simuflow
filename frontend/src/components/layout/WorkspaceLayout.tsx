@@ -8,7 +8,7 @@ import EdgeConfigPanel from '../canvas/EdgeConfigPanel'
 import SimulationHUD from '../canvas/SimulationHUD'
 import MetricsPanel from '../panels/MetricsPanel'
 import TemplatesSidebar from '../panels/TemplatesSidebar'
-import TemplateBadge from '../canvas/TemplateBadge'
+import ConfirmDialog from '../ui/ConfirmDialog'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
@@ -33,6 +33,7 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
 
   return (
     <ReactFlowProvider>
+      <ConfirmDialog />
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-app-bg">
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
@@ -41,7 +42,6 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
             <main className="flex-1 overflow-hidden relative">
               <CanvasPanel />
               <EdgeConfigPanel />
-              <TemplateBadge />
               <SimulationHUD />
             </main>
             <MetricsPanel />
