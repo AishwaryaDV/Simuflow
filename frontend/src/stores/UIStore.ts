@@ -2,6 +2,14 @@ import { makeObservable, observable, computed, action } from 'mobx'
 
 type ActiveModal = 'share' | 'settings' | null
 
+interface ConfirmState {
+  open:      boolean
+  title:     string
+  message:   string
+  onConfirm: () => void
+  danger:    boolean
+}
+
 interface PanelState {
   left:      boolean
   right:     boolean
@@ -23,15 +31,15 @@ class UIStore {
     right:     false,
     bottom:    false,
     chaos:     false,
-    // Auto-open sidebar on reload if a template was previously loaded
-    templates: _persistedSlug !== null,
+    templates: false,
   }
   activeModal:        ActiveModal    = null
   theme:              'dark' | 'light' = 'light'
   onboardingComplete: boolean        = false
   canvasMode:         CanvasMode     = 'select'
   loadedTemplateSlug:   string | null  = _persistedSlug
-  templateDetailsOpen:  boolean        = _persistedSlug !== null
+  templateDetailsOpen:  boolean        = false
+  confirm: ConfirmState = { open: false, title: '', message: '', onConfirm: () => {}, danger: false }
 
   constructor() {
     makeObservable(this, {
@@ -42,6 +50,7 @@ class UIStore {
       canvasMode:          observable,
       loadedTemplateSlug:   observable,
       templateDetailsOpen:  observable,
+      confirm:              observable,
       templateMode:         computed,
       togglePanel:        action,
       openPanel:          action,
@@ -55,6 +64,8 @@ class UIStore {
       openTemplateDetails:  action,
       closeTemplateDetails: action,
       showTemplatesList:    action,
+      openConfirm:          action,
+      closeConfirm:         action,
     })
   }
 
@@ -106,6 +117,14 @@ class UIStore {
 
   closeTemplateDetails() {
     this.templateDetailsOpen = false
+  }
+
+  openConfirm(title: string, message: string, onConfirm: () => void, danger = true) {
+    this.confirm = { open: true, title, message, onConfirm, danger }
+  }
+
+  closeConfirm() {
+    this.confirm = { ...this.confirm, open: false }
   }
 
   /** Open the templates sidebar and always land on the list view. */

@@ -32,11 +32,14 @@ const Toolbar = observer(() => {
 
   const handleClear = useCallback(() => {
     if (graphStore.nodeCount === 0) return
-    if (!confirm('Reset the canvas? This cannot be undone.')) return
-    runInAction(() => {
-      if (!isIdle) simulationStore.stop()
-      graphStore.clearCanvas()
-    })
+    runInAction(() => uiStore.openConfirm(
+      'Reset canvas',
+      'This will clear all nodes and edges. This cannot be undone.',
+      () => runInAction(() => {
+        if (!isIdle) simulationStore.stop()
+        graphStore.clearCanvas()
+      }),
+    ))
   }, [isIdle])
 
   const handlePlay = useCallback(() => {

@@ -171,15 +171,7 @@ const TemplatesSidebar = observer(() => {
     ? (TEMPLATES.find(t => t.slug === uiStore.loadedTemplateSlug) ?? null)
     : null
 
-  const handleLoad = useCallback((template: Template) => {
-    if (loadingSlug) return
-
-    const hasContent = graphStore.nodeCount > 0
-    if (hasContent) {
-      const ok = confirm(`Load "${template.name}"? Your current canvas will be replaced.`)
-      if (!ok) return
-    }
-
+  const doLoad = useCallback((template: Template) => {
     setLoadingSlug(template.slug)
 
     setTimeout(() => {
@@ -202,24 +194,44 @@ const TemplatesSidebar = observer(() => {
       } else if (template.details) {
         localStorage.setItem('simuflow:template-slug', template.slug)
         runInAction(() => uiStore.setLoadedTemplate(template.slug))
-        // templateDetailsOpen is set to true by setLoadedTemplate
       } else {
         localStorage.setItem('simuflow:template-slug', template.slug)
         runInAction(() => { uiStore.setLoadedTemplate(template.slug); uiStore.closePanel('templates') })
       }
     }, 450)
-  }, [loadingSlug, isSimRunning])
+  }, [isSimRunning])
+
+  const handleLoad = useCallback((template: Template) => {
+    if (loadingSlug) return
+
+    const hasContent = graphStore.nodeCount > 0
+    if (hasContent) {
+      runInAction(() => uiStore.openConfirm(
+        `Load template: ${template.name}`,
+        `This will replace your current canvas with the "${template.name}" template. Any unsaved work will be lost.`,
+        () => doLoad(template),
+        false,
+      ))
+      return
+    }
+
+    doLoad(template)
+  }, [loadingSlug, doLoad])
 
   const handleClearCanvas = useCallback(() => {
     if (graphStore.nodeCount === 0) return
-    if (!confirm('Clear the canvas? This cannot be undone.')) return
-    localStorage.removeItem('simuflow:template-slug')
-    runInAction(() => {
-      if (isSimRunning) simulationStore.stop()
-      graphStore.clearCanvas()
-      uiStore.setLoadedTemplate(null)   // also resets templateDetailsOpen
-    })
-    setDetailsFor(null)
+    runInAction(() => uiStore.openConfirm(
+      'Clear canvas',
+      'This will remove all nodes and edges. This cannot be undone.',
+      () => {
+        localStorage.removeItem('simuflow:template-slug')
+        runInAction(() => {
+          if (isSimRunning) simulationStore.stop()
+          graphStore.clearCanvas()
+          uiStore.setLoadedTemplate(null)
+        })
+      },
+    ))
   }, [isSimRunning])
 
   const handleClose = useCallback(() => {
