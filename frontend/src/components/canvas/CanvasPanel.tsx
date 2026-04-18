@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
-  Panel,
   ConnectionMode,
   MarkerType,
   useReactFlow,
@@ -22,7 +21,6 @@ import { edgeTypes } from './edgeTypes'
 import { createDefaultNode, createDefaultStructuralNode } from './nodeConfig'
 import { getCursorForMode } from './CanvasToolbar'
 import CanvasToolbar from './CanvasToolbar'
-import TemplateBadge from './TemplateBadge'
 import type { CustomNodeData } from './CustomNode'
 import type { StructuralRFData } from './StructuralNodeComponent'
 import { NodeType, StructuralNodeType } from '../../types/topology'
@@ -323,9 +321,6 @@ const CanvasPanel = observer(() => {
       >
         <Background gap={20} color="#2a2a3d" variant={'dots' as any} />
         <ZoomDisplay />
-        <Panel position="top-left" style={{ top: '50%', transform: 'translateY(-50%)', left: '62%', margin: 0 }}>
-          <TemplateBadge />
-        </Panel>
       </ReactFlow>
     </div>
   )

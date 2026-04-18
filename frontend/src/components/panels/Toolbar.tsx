@@ -35,10 +35,14 @@ const Toolbar = observer(() => {
     runInAction(() => uiStore.openConfirm(
       'Reset canvas',
       'This will clear all nodes and edges. This cannot be undone.',
-      () => runInAction(() => {
-        if (!isIdle) simulationStore.stop()
-        graphStore.clearCanvas()
-      }),
+      () => {
+        localStorage.removeItem('simuflow:template-slug')
+        runInAction(() => {
+          if (!isIdle) simulationStore.stop()
+          graphStore.clearCanvas()
+          uiStore.setLoadedTemplate(null)
+        })
+      },
     ))
   }, [isIdle])
 
