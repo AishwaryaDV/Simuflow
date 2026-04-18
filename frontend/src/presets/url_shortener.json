@@ -8,95 +8,129 @@
     "nodes": [
       {
         "id": "client-1",
-        "label": "Browser",
-        "position": { "x": 500, "y": 40 },
+        "label": "Global Users",
+        "position": { "x": 430, "y": 20 },
         "nodeType": "client",
         "config": { "rps": 500, "burst": true }
       },
       {
         "id": "dns-1",
         "label": "DNS (Route 53)",
-        "position": { "x": 500, "y": 160 },
+        "position": { "x": 90, "y": 148 },
         "nodeType": "dns",
         "config": { "ttlSeconds": 300, "regions": 4, "latencyMs": 5, "failureRate": 0.0001 }
       },
       {
+        "id": "cdn-1",
+        "label": "CDN (CloudFront)",
+        "position": { "x": 280, "y": 148 },
+        "nodeType": "cdn",
+        "config": { "capacity": 100000, "latencyMs": 8, "failureRate": 0, "timeoutMs": 5000, "hitRate": 0.75 }
+      },
+      {
         "id": "lb-1",
         "label": "Load Balancer",
-        "position": { "x": 500, "y": 300 },
+        "position": { "x": 470, "y": 148 },
         "nodeType": "load_balancer",
         "config": { "capacity": 50000, "latencyMs": 1, "failureRate": 0, "timeoutMs": 5000, "strategy": "round_robin", "replicas": 2 }
       },
       {
         "id": "apigw-1",
         "label": "API Gateway",
-        "position": { "x": 500, "y": 430 },
+        "position": { "x": 660, "y": 148 },
         "nodeType": "api_gateway",
         "config": { "capacity": 20000, "latencyMs": 3, "failureRate": 0.001, "timeoutMs": 5000, "rateLimit": 0 }
       },
       {
         "id": "redirect-1",
         "label": "Redirect Service",
-        "position": { "x": 270, "y": 580 },
+        "position": { "x": 120, "y": 338 },
         "nodeType": "microservice",
         "config": { "capacity": 15000, "latencyMs": 5, "failureRate": 0.001, "timeoutMs": 2000 }
       },
       {
         "id": "keygen-1",
         "label": "Key Gen Service",
-        "position": { "x": 730, "y": 580 },
+        "position": { "x": 500, "y": 338 },
         "nodeType": "microservice",
         "config": { "capacity": 800, "latencyMs": 20, "failureRate": 0.002, "timeoutMs": 3000 }
       },
       {
         "id": "cache-1",
-        "label": "Redis (URL Cache)",
-        "position": { "x": 270, "y": 720 },
+        "label": "Hot URL Cache",
+        "position": { "x": 90, "y": 535 },
         "nodeType": "cache",
         "config": { "capacity": 12000, "latencyMs": 1, "failureRate": 0, "timeoutMs": 500, "hitRate": 0.92 }
       },
       {
         "id": "nosql-1",
-        "label": "DynamoDB (URL Store)",
-        "position": { "x": 500, "y": 870 },
+        "label": "URL Mappings (NoSQL)",
+        "position": { "x": 390, "y": 535 },
         "nodeType": "nosql_store",
         "config": { "readCapacity": 6000, "writeCapacity": 1000, "replicationFactor": 3, "latencyMs": 5, "failureRate": 0.001 }
       },
       {
         "id": "stream-1",
         "label": "Click Events Stream",
-        "position": { "x": 270, "y": 1010 },
+        "position": { "x": 90, "y": 675 },
         "nodeType": "stream",
         "config": { "throughput": 8000, "latencyMs": 10, "failureRate": 0, "timeoutMs": 1000, "consumerGroups": 2 }
       },
       {
         "id": "worker-1",
         "label": "Analytics Worker",
-        "position": { "x": 270, "y": 1150 },
+        "position": { "x": 370, "y": 675 },
         "nodeType": "worker",
         "config": { "throughput": 3000, "latencyMs": 50, "failureRate": 0.001, "timeoutMs": 10000 }
       },
       {
         "id": "objstore-1",
-        "label": "S3 (Analytics Lake)",
-        "position": { "x": 270, "y": 1290 },
+        "label": "Analytics Lake (S3)",
+        "position": { "x": 640, "y": 675 },
         "nodeType": "object_store",
         "config": { "readThroughputMbps": 1000, "latencyMs": 20, "failureRate": 0.0001, "timeoutMs": 10000 }
       }
     ],
     "edges": [
-      { "id": "e1", "sourceId": "client-1",   "targetId": "dns-1" },
-      { "id": "e2", "sourceId": "dns-1",       "targetId": "lb-1" },
-      { "id": "e3", "sourceId": "lb-1",        "targetId": "apigw-1" },
-      { "id": "e4", "sourceId": "apigw-1",     "targetId": "redirect-1", "label": "GET /:code" },
-      { "id": "e5", "sourceId": "apigw-1",     "targetId": "keygen-1",   "label": "POST /shorten" },
-      { "id": "e6", "sourceId": "redirect-1",  "targetId": "cache-1" },
-      { "id": "e7", "sourceId": "cache-1",     "targetId": "nosql-1",    "label": "cache miss" },
-      { "id": "e8", "sourceId": "keygen-1",    "targetId": "nosql-1",    "label": "write mapping" },
-      { "id": "e9", "sourceId": "redirect-1",  "targetId": "stream-1",   "label": "click event" },
-      { "id": "e10", "sourceId": "stream-1",   "targetId": "worker-1" },
-      { "id": "e11", "sourceId": "worker-1",   "targetId": "objstore-1" }
+      { "id": "e1",  "sourceId": "client-1",   "targetId": "dns-1" },
+      { "id": "e2",  "sourceId": "dns-1",       "targetId": "cdn-1" },
+      { "id": "e3",  "sourceId": "cdn-1",       "targetId": "lb-1",      "label": "cache miss" },
+      { "id": "e4",  "sourceId": "lb-1",        "targetId": "apigw-1" },
+      { "id": "e5",  "sourceId": "apigw-1",     "targetId": "redirect-1", "label": "GET /:code" },
+      { "id": "e6",  "sourceId": "apigw-1",     "targetId": "keygen-1",   "label": "POST /shorten" },
+      { "id": "e7",  "sourceId": "redirect-1",  "targetId": "cache-1" },
+      { "id": "e8",  "sourceId": "cache-1",     "targetId": "nosql-1",    "label": "cache miss" },
+      { "id": "e9",  "sourceId": "keygen-1",    "targetId": "nosql-1",    "label": "write mapping" },
+      { "id": "e10", "sourceId": "redirect-1",  "targetId": "stream-1",   "label": "click event" },
+      { "id": "e11", "sourceId": "stream-1",    "targetId": "worker-1" },
+      { "id": "e12", "sourceId": "worker-1",    "targetId": "objstore-1" }
     ],
-    "viewport": { "x": 0, "y": 0, "zoom": 0.75 }
+    "structuralNodes": [
+      {
+        "id": "grp-edge",
+        "label": "Edge & Traffic Layer",
+        "structuralType": "vpc",
+        "position": { "x": 50, "y": 108 },
+        "width": 780,
+        "height": 160
+      },
+      {
+        "id": "grp-app",
+        "label": "Application Services",
+        "structuralType": "vpc",
+        "position": { "x": 50, "y": 298 },
+        "width": 780,
+        "height": 160
+      },
+      {
+        "id": "grp-persistence",
+        "label": "Persistence & Cache",
+        "structuralType": "vpc",
+        "position": { "x": 50, "y": 495 },
+        "width": 780,
+        "height": 330
+      }
+    ],
+    "viewport": { "x": 20, "y": 10, "zoom": 0.8 }
   }
 }
