@@ -9,6 +9,7 @@ import type { TopologySchema } from '../types/topology'
 import webApp        from '../presets/web_app.json'
 import cachedWebApp  from '../presets/cached_web_app.json'
 import urlShortener  from '../presets/url_shortener.json'
+import socialFeed    from '../presets/social_feed.json'
 
 export type TemplateCategory =
   | 'fundamentals'
@@ -149,8 +150,42 @@ export const TEMPLATES: Template[] = [
     name:        'Social Media Feed',
     description: 'Fan-out write pattern across microservices with multi-tier storage and async workers.',
     category:    'distributed',
-    topology:    null,
-    details:     null,
+    topology:    socialFeed.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'Engineering a social feed requires solving the celebrity fan-out problem while maintaining ' +
+        'a responsive, personalised timeline for millions of concurrent users. The architecture uses ' +
+        'a hybrid fan-out model — push-on-write for regular users (post ID pushed to all follower feeds ' +
+        'immediately), pull-on-read for celebrities (merged at query time to avoid writing to millions of rows). ' +
+        'Every post flows through a Kafka-like activity bus, enabling fan-out workers, ML filters, and ' +
+        'notification services to process in parallel without blocking the original post request.',
+      components: [
+        { name: 'WAF',                  role: 'Web Application Firewall — rate limits and filters malicious traffic before it reaches the API layer.' },
+        { name: 'CDN',                  role: '80% hit rate on static assets (images, JS, CSS). Dynamic feed requests always reach origin.' },
+        { name: 'Feed Service',         role: 'Serves personalised timelines. Reads from Redis cache first; falls back to Feed Store on miss.' },
+        { name: 'Post Service',         role: 'Accepts new posts, writes to Feed Store, emits a post event to the Activity Bus.' },
+        { name: 'Media Service',        role: 'Handles media uploads and retrieval. Writes metadata to NoSQL and raw assets to object store.' },
+        { name: 'ML Discovery',         role: 'Personalisation and discovery ranking. Slowest service at 200ms — high concurrency makes it the read bottleneck.' },
+        { name: 'Activity Bus',         role: 'Kafka-like stream. Decouples post writes from all downstream processing — fan-out, notifications, analytics.' },
+        { name: 'Fan Out Worker',       role: 'Pushes post IDs to follower feed stores. The bottleneck during viral/celebrity posts.' },
+        { name: 'Notification Service', role: 'Async push notifications to followers. Consumes from the activity bus independently.' },
+        { name: 'Feed Cache (Redis)',   role: 'Stores top 200 posts per active user in memory. Sub-10ms reads. Only kept warm for users active in past 30 days.' },
+        { name: 'Feed Store (NoSQL)',   role: 'Persistent feed storage. High write capacity to absorb fan-out. Replication factor ×3.' },
+        { name: 'Media Metadata',       role: 'Post metadata, captions, tags — indexed for search and discovery.' },
+        { name: 'Media Assets',         role: 'Raw media object store. Not in the hot read path — CDN absorbs repeat media requests.' },
+      ],
+      watchFor: [
+        'Fan Out Worker queue depth — spikes when a high-follower account posts (celebrity problem).',
+        'Feed Cache hit rate is the key read lever — drop to 0.3 to simulate a cold cache after deploy.',
+        'ML Discovery saturates first on the read path — 200ms latency makes it the throughput ceiling.',
+        'Activity Bus absorbs post bursts cleanly — worker backpressure never blocks the Post Service.',
+        'Feed Store write utilisation climbs with fan-out volume — watch both read and write dimensions.',
+      ],
+      tryThis:
+        'Simulate a viral moment: raise Client RPS to 2,000 and watch the Fan Out Worker queue depth ' +
+        'climb as it struggles to push to follower feeds faster than posts arrive. Then drop Fan Out ' +
+        'Worker throughput to 2,000 to model a degraded worker pool and observe how the queue grows unbounded.',
+    },
   },
   {
     slug:        'video_streaming',
