@@ -10,6 +10,7 @@ import webApp        from '../presets/web_app.json'
 import cachedWebApp  from '../presets/cached_web_app.json'
 import urlShortener  from '../presets/url_shortener.json'
 import socialFeed    from '../presets/social_feed.json'
+import aiAgent       from '../presets/ai_agent.json'
 
 export type TemplateCategory =
   | 'fundamentals'
@@ -218,10 +219,53 @@ export const TEMPLATES: Template[] = [
   {
     slug:        'ai_agent',
     name:        'AI Agent Orchestration',
-    description: 'Agentic workflows with LLM gateways, vector memory, tool registries and orchestrators.',
+    description: 'Autonomous reasoning architecture with LLM routing, vector memory, tool registries and persistent session state.',
     category:    'ai',
-    topology:    null,
-    details:     null,
+    topology:    aiAgent.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'Engineering an agentic system means orchestrating LLM reasoning loops with external tools ' +
+        'while managing both ephemeral and persistent context. Unlike a stateless API, each agent run ' +
+        'involves multiple sequential LLM calls, vector searches, graph lookups, and state writes — ' +
+        'so latency compounds and the cost model is fundamentally different from request/response services. ' +
+        'The architecture separates concerns into an Orchestration Layer (reasoning, routing, safety) and ' +
+        'a Knowledge & Context Layer (memory, tools, graph relations).',
+      components: [
+        { name: 'LLM Gateway',
+          role: 'Routes prompts across models — simple tasks to cheaper models, complex reasoning to flagship. ' +
+                'Provides unified rate limiting to prevent runaway agent loops from draining the API budget.' },
+        { name: 'Agent Orchestrator',
+          role: 'Manages the reasoning loop: plan → tool call → observe → re-plan. ' +
+                'Stateful (DB-backed) to support multi-day workflows and session continuity across devices.' },
+        { name: 'Safety & Observability Mesh',
+          role: 'Sidecar that audits every LLM output for policy violations and records token usage, ' +
+                'latency per step, and tool call traces. Fail-open — outage degrades visibility, not throughput.' },
+        { name: 'Vector Memory (Pinecone)',
+          role: 'Long-term semantic memory. Documents → embeddings → HNSW index for sub-100ms k-NN search. ' +
+                'Returns top-k context paragraphs relevant to the current task.' },
+        { name: 'Knowledge Graph',
+          role: 'Entity and relationship store. Agents query for structured facts (e.g. "who owns this repo?") ' +
+                'that are too structured for vector search but too relational for a key-value store.' },
+        { name: 'Tool Registry',
+          role: 'Catalogue of available tools (APIs, code executors, search). ' +
+                'Agents query it to discover what capabilities exist before deciding how to act. ' +
+                'Lookup latency scales logarithmically with the number of registered tools.' },
+        { name: 'Memory Fabric',
+          role: 'Persistent working memory — current plan, intermediate tool results, conversation history. ' +
+                'Write-heavy (agents write state every step). Session capacity governs max concurrent runs.' },
+      ],
+      watchFor: [
+        'LLM Gateway TPM utilisation — the most likely hard ceiling; raises costs before causing errors.',
+        'Agent Orchestrator concurrency — maxConcurrentAgents × maxSteps determines total LLM call fan-out.',
+        'Vector DB query capacity — semantic search runs on every agent step, making it a quiet bottleneck.',
+        'Memory Fabric write utilisation — climbs sharply with concurrent sessions × steps per run.',
+        'Tool Registry lookup latency — grows logarithmically with toolCount; large registries slow every step.',
+      ],
+      tryThis:
+        'Raise Client RPS to 200 and watch the LLM Gateway TPM utilisation spike as each request ' +
+        'fans out into multiple reasoning steps. Then drop rateLimitTpm to 50,000 to simulate a ' +
+        'provider quota cut — observe how the orchestrator backs up and error rate climbs.',
+    },
   },
 ]
 

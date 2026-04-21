@@ -11,6 +11,7 @@ import type {
   ApiGatewayConfig, ServerlessConfig, WorkerConfig, PubSubConfig, StreamConfig,
   RateLimiterConfig, ObjectStoreConfig, ExternalServiceConfig, LLMGatewayConfig,
   VectorDBConfig, AgentOrchestratorConfig, DNSConfig, NoSQLStoreConfig, WAFConfig, GraphDBConfig,
+  ObservabilityMeshConfig, ToolRegistryConfig, MemoryFabricConfig,
 } from '../../types/topology'
 import { NODE_DISPLAY, STRUCTURAL_DISPLAY } from '../canvas/nodeConfig'
 import { costStore } from '../../stores/CostStore'
@@ -457,6 +458,70 @@ function GraphDBFields({ nodeId, cfg }: { nodeId: string; cfg: GraphDBConfig }) 
   )
 }
 
+function ObservabilityMeshFields({ nodeId, cfg }: { nodeId: string; cfg: ObservabilityMeshConfig }) {
+  const patch = (p: Partial<ObservabilityMeshConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Inspection capacity (req/s)" hint="Exceeding this causes sampling degradation — utilisation climbs but traffic still passes">
+          <NumInput value={cfg.inspectionRps} onChange={v => patch({ inspectionRps: v })} min={1} />
+        </Field>
+        <Field label="Sampling rate" hint="Fraction of requests recorded as full traces">
+          <RangeInput value={cfg.samplingRate} onChange={v => patch({ samplingRate: v })} />
+        </Field>
+        <Field label="Per-request overhead (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={0} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate" hint="Fail-open: mesh failure passes traffic through unobserved">
+          <RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} />
+        </Field>
+      </FieldGroup>
+    </>
+  )
+}
+
+function ToolRegistryFields({ nodeId, cfg }: { nodeId: string; cfg: ToolRegistryConfig }) {
+  const patch = (p: Partial<ToolRegistryConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Lookup capacity (req/s)"><NumInput value={cfg.capacity} onChange={v => patch({ capacity: v })} min={1} /></Field>
+        <Field label="Registered tools" hint="More tools = higher lookup latency (log scale)">
+          <NumInput value={cfg.toolCount} onChange={v => patch({ toolCount: v })} min={1} max={1000} />
+        </Field>
+        <Field label="Base lookup latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={1} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate"><RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} /></Field>
+      </FieldGroup>
+    </>
+  )
+}
+
+function MemoryFabricFields({ nodeId, cfg }: { nodeId: string; cfg: MemoryFabricConfig }) {
+  const patch = (p: Partial<MemoryFabricConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Read capacity (ops/s)"><NumInput value={cfg.readCapacity} onChange={v => patch({ readCapacity: v })} min={1} /></Field>
+        <Field label="Write capacity (ops/s)" hint="Agent state is write-heavy — 60% of ops are writes">
+          <NumInput value={cfg.writeCapacity} onChange={v => patch({ writeCapacity: v })} min={1} />
+        </Field>
+        <Field label="Session capacity" hint="Max concurrent agent sessions held in memory">
+          <NumInput value={cfg.sessionCapacity} onChange={v => patch({ sessionCapacity: v })} min={1} />
+        </Field>
+        <Field label="Read/write latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={1} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate"><RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} /></Field>
+      </FieldGroup>
+    </>
+  )
+}
+
 // ── Structural node config (label + notes only) ───────────────────────────────
 
 function StructuralFields({ nodeId }: { nodeId: string }) {
@@ -510,6 +575,9 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
     [NodeType.NoSQLStore]:        0.095,
     [NodeType.WAF]:               0.080,
     [NodeType.GraphDB]:           0.350,
+    [NodeType.ObservabilityMesh]: 0.050,
+    [NodeType.ToolRegistry]:      0.021,
+    [NodeType.MemoryFabric]:      0.068,
   }
   const rate = BASE_HR_HINT[nodeType]
 
@@ -621,6 +689,9 @@ const ConfigPanel = observer(() => {
       case NodeType.NoSQLStore:        return <NoSQLStoreFields nodeId={nodeId!} cfg={node.config as NoSQLStoreConfig} />
       case NodeType.WAF:               return <WAFFields nodeId={nodeId!} cfg={node.config as WAFConfig} />
       case NodeType.GraphDB:           return <GraphDBFields nodeId={nodeId!} cfg={node.config as GraphDBConfig} />
+      case NodeType.ObservabilityMesh: return <ObservabilityMeshFields nodeId={nodeId!} cfg={node.config as ObservabilityMeshConfig} />
+      case NodeType.ToolRegistry:      return <ToolRegistryFields nodeId={nodeId!} cfg={node.config as ToolRegistryConfig} />
+      case NodeType.MemoryFabric:      return <MemoryFabricFields nodeId={nodeId!} cfg={node.config as MemoryFabricConfig} />
       default:                         return <BaseFields nodeId={nodeId!} cfg={node.config as BaseNodeConfig} />
     }
   }

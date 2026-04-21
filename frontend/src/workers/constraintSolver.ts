@@ -15,6 +15,7 @@ import type {
   PubSubConfig, StreamConfig, RateLimiterConfig, ObjectStoreConfig,
   ExternalServiceConfig, LLMGatewayConfig, VectorDBConfig, AgentOrchestratorConfig,
   DNSConfig, NoSQLStoreConfig, WAFConfig, GraphDBConfig,
+  ObservabilityMeshConfig, ToolRegistryConfig, MemoryFabricConfig,
 } from '../types/topology'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -311,6 +312,54 @@ export function computeNodeFlow(
         outRps:         failed ? incomingRps : allowed,  // fail-open: WAF failure passes all traffic
         utilisationPct: util * 100,
         errorRate:      cfg.blockRate,                   // blocked traffic = error from client perspective
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.ObservabilityMesh: {
+      const cfg  = node.config as ObservabilityMeshConfig
+      // Fail-open: if the mesh goes down, traffic passes through unobserved.
+      // Utilisation is against inspection capacity — high-traffic services
+      // can overwhelm the mesh and cause sampling degradation.
+      const util   = incomingRps / Math.max(cfg.inspectionRps, 1)
+      const failed = failureRoll < cfg.failureRate
+      return {
+        outRps:         incomingRps,   // mesh never drops traffic
+        utilisationPct: util * 100,
+        errorRate:      failed ? 0.001 : 0,   // silent loss of observability, not request failure
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.ToolRegistry: {
+      const cfg  = node.config as ToolRegistryConfig
+      // Lookup latency scales logarithmically with tool count.
+      // High tool count = slower discovery = lower effective throughput.
+      const lookupOverhead = Math.log2(Math.max(cfg.toolCount, 2)) / 10
+      const effectiveCap   = cfg.capacity / (1 + lookupOverhead)
+      const util           = incomingRps / Math.max(effectiveCap, 1)
+      const failed         = failureRoll < cfg.failureRate
+      return {
+        outRps:         failed ? 0 : Math.min(incomingRps, effectiveCap),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.MemoryFabric: {
+      const cfg       = node.config as MemoryFabricConfig
+      // Agent workloads are write-heavy per step (60% writes, 40% reads).
+      const readRps   = incomingRps * 0.4
+      const writeRps  = incomingRps * 0.6
+      const readUtil  = readRps  / Math.max(cfg.readCapacity, 1)
+      const writeUtil = writeRps / Math.max(cfg.writeCapacity, 1)
+      const util      = Math.max(readUtil, writeUtil)
+      const failed    = failureRoll < cfg.failureRate
+      return {
+        outRps:         failed ? 0 : Math.min(incomingRps, cfg.readCapacity + cfg.writeCapacity),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
       }
     }

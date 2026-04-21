@@ -1,0 +1,141 @@
+{
+  "slug": "ai_agent",
+  "name": "AI Agent Orchestration",
+  "description": "Autonomous reasoning architecture with LLM routing, tool execution, vector memory and persistent session state.",
+  "category": "ai",
+  "topology": {
+    "version": "2.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "Users",
+        "position": { "x": 440, "y": 20 },
+        "nodeType": "client",
+        "config": { "rps": 50, "burst": false }
+      },
+
+      {
+        "id": "llm-gw",
+        "label": "LLM Gateway",
+        "position": { "x": 120, "y": 190 },
+        "nodeType": "llm_gateway",
+        "config": {
+          "tokensPerSecond": 80,
+          "avgPromptTokens": 800,
+          "avgCompletionTokens": 400,
+          "rateLimitTpm": 150000,
+          "failureRate": 0.02,
+          "timeoutMs": 60000
+        }
+      },
+      {
+        "id": "agent-orch",
+        "label": "Agent Orchestrator",
+        "position": { "x": 380, "y": 190 },
+        "nodeType": "agent_orchestrator",
+        "config": {
+          "maxConcurrentAgents": 20,
+          "stepLatencyMs": 80,
+          "maxSteps": 15,
+          "failureRate": 0.03,
+          "timeoutMs": 120000
+        }
+      },
+      {
+        "id": "obs-mesh",
+        "label": "Safety & Observability Mesh",
+        "position": { "x": 640, "y": 190 },
+        "nodeType": "observability_mesh",
+        "config": {
+          "inspectionRps": 10000,
+          "samplingRate": 0.15,
+          "latencyMs": 3,
+          "failureRate": 0
+        }
+      },
+
+      {
+        "id": "vector-db",
+        "label": "Vector Memory (Pinecone)",
+        "position": { "x": 80, "y": 430 },
+        "nodeType": "vector_db",
+        "config": {
+          "queryCapacity": 500,
+          "indexSizeM": 10,
+          "dimensions": 1536,
+          "queryLatencyMs": 40,
+          "failureRate": 0.005
+        }
+      },
+      {
+        "id": "graph-db",
+        "label": "Knowledge Graph",
+        "position": { "x": 290, "y": 430 },
+        "nodeType": "graph_db",
+        "config": {
+          "queryCapacity": 1000,
+          "writeCapacity": 300,
+          "latencyMs": 25,
+          "failureRate": 0.002
+        }
+      },
+      {
+        "id": "tool-reg",
+        "label": "Tool Registry",
+        "position": { "x": 510, "y": 430 },
+        "nodeType": "tool_registry",
+        "config": {
+          "capacity": 3000,
+          "toolCount": 40,
+          "latencyMs": 12,
+          "failureRate": 0.001
+        }
+      },
+      {
+        "id": "mem-fabric",
+        "label": "Memory Fabric",
+        "position": { "x": 720, "y": 430 },
+        "nodeType": "memory_fabric",
+        "config": {
+          "readCapacity": 8000,
+          "writeCapacity": 4000,
+          "sessionCapacity": 200,
+          "latencyMs": 8,
+          "failureRate": 0.001
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e1",  "sourceId": "client-1",   "targetId": "llm-gw",     "label": "prompt" },
+      { "id": "e2",  "sourceId": "client-1",   "targetId": "agent-orch" },
+      { "id": "e3",  "sourceId": "agent-orch",  "targetId": "llm-gw",     "label": "reasoning loop" },
+      { "id": "e4",  "sourceId": "agent-orch",  "targetId": "obs-mesh",   "label": "audit" },
+      { "id": "e5",  "sourceId": "agent-orch",  "targetId": "tool-reg",   "label": "tool lookup" },
+      { "id": "e6",  "sourceId": "agent-orch",  "targetId": "mem-fabric", "label": "read/write state" },
+      { "id": "e7",  "sourceId": "agent-orch",  "targetId": "vector-db",  "label": "semantic search" },
+      { "id": "e8",  "sourceId": "agent-orch",  "targetId": "graph-db",   "label": "entity lookup" },
+      { "id": "e9",  "sourceId": "llm-gw",      "targetId": "obs-mesh",   "label": "token usage" },
+      { "id": "e10", "sourceId": "vector-db",   "targetId": "agent-orch", "label": "top-k context" },
+      { "id": "e11", "sourceId": "graph-db",    "targetId": "agent-orch", "label": "relations" }
+    ],
+    "structuralNodes": [
+      {
+        "id": "grp-orchestration",
+        "label": "AI Orchestration Layer",
+        "structuralType": "vpc",
+        "position": { "x": 50, "y": 140 },
+        "width": 740,
+        "height": 160
+      },
+      {
+        "id": "grp-knowledge",
+        "label": "Knowledge & Context Layer",
+        "structuralType": "vpc",
+        "position": { "x": 50, "y": 380 },
+        "width": 740,
+        "height": 160
+      }
+    ],
+    "viewport": { "x": 20, "y": 10, "zoom": 0.85 }
+  }
+}

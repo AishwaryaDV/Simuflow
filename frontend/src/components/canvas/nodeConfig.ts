@@ -8,6 +8,7 @@ import {
   Monitor, GitBranch, Server, Zap, Database, List, Globe, Box,
   Route, Settings2, Radio, Waves, Gauge, Archive,
   ExternalLink, Bot, BrainCircuit, Network, Cpu, Layers, Share2,
+  Activity, Wrench as WrenchIcon, MemoryStick,
   // Structural
   CloudCog, LayoutGrid, Building2, Map, Shield, GitMerge,
   Flame, ArrowLeftRight, Wrench, Brain, Hexagon, Copy, Type,
@@ -158,6 +159,21 @@ export const NODE_DISPLAY: Record<NodeType, NodeDisplayConfig> = {
     description: 'Graph database — optimised for relationship traversal queries and connected data',
     colorClass: 'bg-violet-950/60', borderClass: 'border-violet-700/70', textClass: 'text-violet-300',
   },
+  [NodeType.ObservabilityMesh]: {
+    label: 'Observability Mesh', icon: Activity, category: 'Compute',
+    description: 'Sidecar mesh — samples traces, exports metrics, adds per-request inspection overhead',
+    colorClass: 'bg-teal-950/60', borderClass: 'border-teal-700/70', textClass: 'text-teal-300',
+  },
+  [NodeType.ToolRegistry]: {
+    label: 'Tool Registry', icon: WrenchIcon, category: 'AI & Agents',
+    description: 'Tool discovery and routing — agents query this to resolve capabilities before execution',
+    colorClass: 'bg-amber-950/60', borderClass: 'border-amber-700/70', textClass: 'text-amber-300',
+  },
+  [NodeType.MemoryFabric]: {
+    label: 'Memory Fabric', icon: MemoryStick, category: 'AI & Agents',
+    description: 'Persistent working memory — stores agent session state, intermediate plans, tool results',
+    colorClass: 'bg-pink-950/60', borderClass: 'border-pink-700/70', textClass: 'text-pink-300',
+  },
 }
 
 // ─── Structural node display ──────────────────────────────────────────────────
@@ -241,6 +257,12 @@ export function createDefaultNode(nodeType: NodeType, position: CanvasPosition):
       return { ...base, nodeType, config: { inspectionCapacity: 50_000, blockRate: 0.01, latencyMs: 2, failureRate: 0 } }
     case NodeType.GraphDB:
       return { ...base, nodeType, config: { queryCapacity: 2000, writeCapacity: 500, latencyMs: 20, failureRate: 0.001 } }
+    case NodeType.ObservabilityMesh:
+      return { ...base, nodeType, config: { inspectionRps: 20_000, samplingRate: 0.1, latencyMs: 3, failureRate: 0 } }
+    case NodeType.ToolRegistry:
+      return { ...base, nodeType, config: { capacity: 5000, toolCount: 20, latencyMs: 10, failureRate: 0.001 } }
+    case NodeType.MemoryFabric:
+      return { ...base, nodeType, config: { readCapacity: 10_000, writeCapacity: 5000, sessionCapacity: 500, latencyMs: 8, failureRate: 0.001 } }
   }
 }
 

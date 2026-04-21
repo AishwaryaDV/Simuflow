@@ -51,6 +51,9 @@ export enum NodeType {
   NoSQLStore        = "nosql_store",
   WAF               = "waf",
   GraphDB           = "graph_db",
+  ObservabilityMesh = "observability_mesh",
+  ToolRegistry      = "tool_registry",
+  MemoryFabric      = "memory_fabric",
 }
 
 /** Structural nodes render as containers/regions on the canvas.
@@ -343,6 +346,41 @@ export interface GraphDBConfig {
   failureRate: number;
 }
 
+export interface ObservabilityMeshConfig {
+  /** Max requests/sec the mesh can inspect before adding backpressure. */
+  inspectionRps: number;
+  /** Fraction of requests sampled for full trace recording (0–1). */
+  samplingRate: number;
+  /** Per-request latency overhead added by sidecar inspection in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of mesh failure (fail-open: traffic passes through). */
+  failureRate: number;
+}
+
+export interface ToolRegistryConfig {
+  /** Max tool-lookup requests per second before saturation. */
+  capacity: number;
+  /** Number of registered tools — more tools increases lookup latency. */
+  toolCount: number;
+  /** Base lookup latency in ms (scales logarithmically with toolCount). */
+  latencyMs: number;
+  /** Probability 0–1 of registry failure. */
+  failureRate: number;
+}
+
+export interface MemoryFabricConfig {
+  /** Max read operations per second (conversation state reads). */
+  readCapacity: number;
+  /** Max write operations per second (agent state persistence per step). */
+  writeCapacity: number;
+  /** Max concurrent agent sessions in memory. */
+  sessionCapacity: number;
+  /** Base read/write latency in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of failure. */
+  failureRate: number;
+}
+
 export interface AgentOrchestratorConfig {
   /** Max number of agent loops that can run simultaneously. */
   maxConcurrentAgents: number;
@@ -384,7 +422,10 @@ export type NodeConfig =
   | { nodeType: NodeType.DNS;               config: DNSConfig }
   | { nodeType: NodeType.NoSQLStore;        config: NoSQLStoreConfig }
   | { nodeType: NodeType.WAF;               config: WAFConfig }
-  | { nodeType: NodeType.GraphDB;           config: GraphDBConfig };
+  | { nodeType: NodeType.GraphDB;           config: GraphDBConfig }
+  | { nodeType: NodeType.ObservabilityMesh; config: ObservabilityMeshConfig }
+  | { nodeType: NodeType.ToolRegistry;      config: ToolRegistryConfig }
+  | { nodeType: NodeType.MemoryFabric;      config: MemoryFabricConfig };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STRUCTURAL NODES

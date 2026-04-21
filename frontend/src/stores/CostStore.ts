@@ -41,6 +41,9 @@ const BASE_HR: Partial<Record<NodeType, number>> = {
   [NodeType.NoSQLStore]: 0.095, // DynamoDB on-demand base
   [NodeType.WAF]: 0.08, // AWS WAF WebACL base
   [NodeType.GraphDB]: 0.35, // Neptune db.r6g.large base
+  [NodeType.ObservabilityMesh]: 0.05, // Datadog/OTel collector
+  [NodeType.ToolRegistry]: 0.021, // t3.small service
+  [NodeType.MemoryFabric]: 0.068, // ElastiCache cache.t3.small
 };
 
 /** Approximate $/million requests for request-priced services. */
