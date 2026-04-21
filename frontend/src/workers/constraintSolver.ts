@@ -14,7 +14,7 @@ import type {
   QueueConfig, ApiGatewayConfig, ServerlessConfig, WorkerConfig as WorkerNodeConfig,
   PubSubConfig, StreamConfig, RateLimiterConfig, ObjectStoreConfig,
   ExternalServiceConfig, LLMGatewayConfig, VectorDBConfig, AgentOrchestratorConfig,
-  DNSConfig, NoSQLStoreConfig,
+  DNSConfig, NoSQLStoreConfig, WAFConfig, GraphDBConfig,
 } from '../types/topology'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -294,6 +294,38 @@ export function computeNodeFlow(
       const totalCapacity = cfg.readCapacity + cfg.writeCapacity / cfg.replicationFactor
       return {
         outRps:         failed ? 0 : Math.min(incomingRps, totalCapacity),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.WAF: {
+      const cfg     = node.config as WAFConfig
+      // WAF blocks a fraction of traffic and adds inspection latency.
+      // Utilisation is against inspection capacity — exceeding it means WAF becomes the bottleneck.
+      const allowed = incomingRps * (1 - cfg.blockRate)
+      const util    = incomingRps / Math.max(cfg.inspectionCapacity, 1)
+      const failed  = failureRoll < cfg.failureRate
+      return {
+        outRps:         failed ? incomingRps : allowed,  // fail-open: WAF failure passes all traffic
+        utilisationPct: util * 100,
+        errorRate:      cfg.blockRate,                   // blocked traffic = error from client perspective
+        queueDepth:     0,
+      }
+    }
+
+    case NodeType.GraphDB: {
+      const cfg    = node.config as GraphDBConfig
+      // Graph queries are read-heavy; assume 70% reads / 30% writes
+      const readRps  = incomingRps * 0.7
+      const writeRps = incomingRps * 0.3
+      const readUtil  = readRps  / Math.max(cfg.queryCapacity, 1)
+      const writeUtil = writeRps / Math.max(cfg.writeCapacity, 1)
+      const util      = Math.max(readUtil, writeUtil)
+      const failed    = failureRoll < cfg.failureRate
+      return {
+        outRps:         failed ? 0 : Math.min(incomingRps, cfg.queryCapacity + cfg.writeCapacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,

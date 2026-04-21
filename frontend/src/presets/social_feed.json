@@ -1,0 +1,185 @@
+{
+  "slug": "social_feed",
+  "name": "Social Media Feed",
+  "description": "Distributed fan-out architecture with hybrid push/pull feed delivery and async event processing.",
+  "category": "distributed",
+  "topology": {
+    "version": "1.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "Users",
+        "position": { "x": 440, "y": 20 },
+        "nodeType": "client",
+        "config": { "rps": 800, "burst": true }
+      },
+      {
+        "id": "dns-1",
+        "label": "DNS",
+        "position": { "x": 80, "y": 148 },
+        "nodeType": "dns",
+        "config": { "ttlSeconds": 300, "regions": 6, "latencyMs": 5, "failureRate": 0.0001 }
+      },
+      {
+        "id": "cdn-1",
+        "label": "CDN",
+        "position": { "x": 240, "y": 148 },
+        "nodeType": "cdn",
+        "config": { "capacity": 200000, "latencyMs": 5, "failureRate": 0, "timeoutMs": 5000, "hitRate": 0.80 }
+      },
+      {
+        "id": "lb-1",
+        "label": "Load Balancer",
+        "position": { "x": 400, "y": 148 },
+        "nodeType": "load_balancer",
+        "config": { "capacity": 100000, "latencyMs": 1, "failureRate": 0, "timeoutMs": 5000, "strategy": "round_robin", "replicas": 4 }
+      },
+      {
+        "id": "waf-1",
+        "label": "WAF",
+        "position": { "x": 560, "y": 148 },
+        "nodeType": "waf",
+        "config": { "inspectionCapacity": 80000, "blockRate": 0.02, "latencyMs": 2, "failureRate": 0 }
+      },
+      {
+        "id": "apigw-1",
+        "label": "API Gateway",
+        "position": { "x": 720, "y": 148 },
+        "nodeType": "api_gateway",
+        "config": { "capacity": 50000, "latencyMs": 5, "failureRate": 0.001, "timeoutMs": 5000, "rateLimit": 0 }
+      },
+      {
+        "id": "feed-svc",
+        "label": "Feed Service",
+        "position": { "x": 70, "y": 336 },
+        "nodeType": "microservice",
+        "config": { "capacity": 20000, "latencyMs": 30, "failureRate": 0.001, "timeoutMs": 3000 }
+      },
+      {
+        "id": "post-svc",
+        "label": "Post Service",
+        "position": { "x": 225, "y": 336 },
+        "nodeType": "microservice",
+        "config": { "capacity": 5000, "latencyMs": 50, "failureRate": 0.002, "timeoutMs": 5000 }
+      },
+      {
+        "id": "media-svc",
+        "label": "Media Service",
+        "position": { "x": 380, "y": 336 },
+        "nodeType": "microservice",
+        "config": { "capacity": 8000, "latencyMs": 100, "failureRate": 0.002, "timeoutMs": 10000 }
+      },
+      {
+        "id": "ml-svc",
+        "label": "ML Discovery",
+        "position": { "x": 535, "y": 336 },
+        "nodeType": "microservice",
+        "config": { "capacity": 3000, "latencyMs": 200, "failureRate": 0.005, "timeoutMs": 5000 }
+      },
+      {
+        "id": "activity-bus",
+        "label": "Activity Bus",
+        "position": { "x": 762, "y": 328 },
+        "nodeType": "stream",
+        "config": { "throughput": 50000, "latencyMs": 5, "failureRate": 0, "timeoutMs": 1000, "consumerGroups": 3 }
+      },
+      {
+        "id": "fanout-worker",
+        "label": "Fan Out Worker",
+        "position": { "x": 762, "y": 448 },
+        "nodeType": "worker",
+        "config": { "throughput": 10000, "latencyMs": 100, "failureRate": 0.001, "timeoutMs": 15000 }
+      },
+      {
+        "id": "notif-svc",
+        "label": "Notification Service",
+        "position": { "x": 762, "y": 568 },
+        "nodeType": "microservice",
+        "config": { "capacity": 15000, "latencyMs": 20, "failureRate": 0.001, "timeoutMs": 5000 }
+      },
+      {
+        "id": "feed-cache",
+        "label": "Feed Cache (Redis)",
+        "position": { "x": 80, "y": 736 },
+        "nodeType": "cache",
+        "config": { "capacity": 50000, "latencyMs": 2, "failureRate": 0, "timeoutMs": 500, "hitRate": 0.90 }
+      },
+      {
+        "id": "media-meta",
+        "label": "Media Metadata",
+        "position": { "x": 290, "y": 736 },
+        "nodeType": "nosql_store",
+        "config": { "readCapacity": 15000, "writeCapacity": 3000, "replicationFactor": 3, "latencyMs": 5, "failureRate": 0.001 }
+      },
+      {
+        "id": "feed-store",
+        "label": "Feed Store (NoSQL)",
+        "position": { "x": 500, "y": 736 },
+        "nodeType": "nosql_store",
+        "config": { "readCapacity": 20000, "writeCapacity": 10000, "replicationFactor": 3, "latencyMs": 8, "failureRate": 0.001 }
+      },
+      {
+        "id": "media-assets",
+        "label": "Media Assets",
+        "position": { "x": 710, "y": 736 },
+        "nodeType": "object_store",
+        "config": { "readThroughputMbps": 10000, "latencyMs": 30, "failureRate": 0.0001, "timeoutMs": 10000 }
+      }
+    ],
+    "edges": [
+      { "id": "e1",  "sourceId": "client-1",     "targetId": "dns-1" },
+      { "id": "e2",  "sourceId": "dns-1",         "targetId": "cdn-1" },
+      { "id": "e3",  "sourceId": "cdn-1",         "targetId": "lb-1",       "label": "cache miss" },
+      { "id": "e4",  "sourceId": "lb-1",          "targetId": "waf-1" },
+      { "id": "e5",  "sourceId": "waf-1",         "targetId": "apigw-1" },
+      { "id": "e6",  "sourceId": "apigw-1",       "targetId": "feed-svc" },
+      { "id": "e7",  "sourceId": "apigw-1",       "targetId": "post-svc" },
+      { "id": "e8",  "sourceId": "apigw-1",       "targetId": "media-svc" },
+      { "id": "e9",  "sourceId": "apigw-1",       "targetId": "ml-svc" },
+      { "id": "e10", "sourceId": "post-svc",      "targetId": "activity-bus" },
+      { "id": "e11", "sourceId": "activity-bus",  "targetId": "fanout-worker" },
+      { "id": "e12", "sourceId": "activity-bus",  "targetId": "notif-svc" },
+      { "id": "e13", "sourceId": "fanout-worker", "targetId": "feed-store" },
+      { "id": "e14", "sourceId": "feed-svc",      "targetId": "feed-cache" },
+      { "id": "e15", "sourceId": "feed-cache",    "targetId": "feed-store",  "label": "cache miss" },
+      { "id": "e16", "sourceId": "media-svc",     "targetId": "media-meta" },
+      { "id": "e17", "sourceId": "media-svc",     "targetId": "media-assets" },
+      { "id": "e18", "sourceId": "ml-svc",        "targetId": "feed-cache",  "label": "personalise" }
+    ],
+    "structuralNodes": [
+      {
+        "id": "grp-edge",
+        "label": "Edge Network",
+        "structuralType": "vpc",
+        "position": { "x": 40, "y": 90 },
+        "width": 920,
+        "height": 160
+      },
+      {
+        "id": "grp-microservice",
+        "label": "Microservice Layer",
+        "structuralType": "vpc",
+        "position": { "x": 40, "y": 278 },
+        "width": 660,
+        "height": 160
+      },
+      {
+        "id": "grp-eventbus",
+        "label": "Event Bus & Workers",
+        "structuralType": "vpc",
+        "position": { "x": 720, "y": 278 },
+        "width": 260,
+        "height": 390
+      },
+      {
+        "id": "grp-datastore",
+        "label": "Global Data Store",
+        "structuralType": "vpc",
+        "position": { "x": 40, "y": 688 },
+        "width": 920,
+        "height": 160
+      }
+    ],
+    "viewport": { "x": 10, "y": 10, "zoom": 0.75 }
+  }
+}

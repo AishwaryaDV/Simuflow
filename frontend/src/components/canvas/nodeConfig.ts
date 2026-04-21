@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Monitor, GitBranch, Server, Zap, Database, List, Globe, Box,
   Route, Settings2, Radio, Waves, Gauge, Archive,
-  ExternalLink, Bot, BrainCircuit, Network, Cpu, Layers,
+  ExternalLink, Bot, BrainCircuit, Network, Cpu, Layers, Share2,
   // Structural
   CloudCog, LayoutGrid, Building2, Map, Shield, GitMerge,
   Flame, ArrowLeftRight, Wrench, Brain, Hexagon, Copy, Type,
@@ -148,6 +148,16 @@ export const NODE_DISPLAY: Record<NodeType, NodeDisplayConfig> = {
     description: 'Horizontally scalable key-value store — separate read/write capacity, no transactions',
     colorClass: 'bg-lime-950/60', borderClass: 'border-lime-700/70', textClass: 'text-lime-300',
   },
+  [NodeType.WAF]: {
+    label: 'WAF', icon: Shield, category: 'Traffic & Edge',
+    description: 'Web Application Firewall — inspects traffic, blocks malicious requests before origin',
+    colorClass: 'bg-orange-950/60', borderClass: 'border-orange-700/70', textClass: 'text-orange-300',
+  },
+  [NodeType.GraphDB]: {
+    label: 'Graph DB', icon: Share2, category: 'Storage',
+    description: 'Graph database — optimised for relationship traversal queries and connected data',
+    colorClass: 'bg-violet-950/60', borderClass: 'border-violet-700/70', textClass: 'text-violet-300',
+  },
 }
 
 // ─── Structural node display ──────────────────────────────────────────────────
@@ -227,6 +237,10 @@ export function createDefaultNode(nodeType: NodeType, position: CanvasPosition):
       return { ...base, nodeType, config: { ttlSeconds: 300, regions: 4, latencyMs: 5, failureRate: 0.0001 } }
     case NodeType.NoSQLStore:
       return { ...base, nodeType, config: { readCapacity: 5000, writeCapacity: 1000, replicationFactor: 3, latencyMs: 5, failureRate: 0.001 } }
+    case NodeType.WAF:
+      return { ...base, nodeType, config: { inspectionCapacity: 50_000, blockRate: 0.01, latencyMs: 2, failureRate: 0 } }
+    case NodeType.GraphDB:
+      return { ...base, nodeType, config: { queryCapacity: 2000, writeCapacity: 500, latencyMs: 20, failureRate: 0.001 } }
   }
 }
 

@@ -49,6 +49,8 @@ export enum NodeType {
   // ── v2.1 additions ───────────────────────────────────────────────────────────
   DNS               = "dns",
   NoSQLStore        = "nosql_store",
+  WAF               = "waf",
+  GraphDB           = "graph_db",
 }
 
 /** Structural nodes render as containers/regions on the canvas.
@@ -319,6 +321,28 @@ export interface NoSQLStoreConfig {
   failureRate: number;
 }
 
+export interface WAFConfig {
+  /** Max requests/sec the WAF can inspect before it becomes a bottleneck. */
+  inspectionCapacity: number;
+  /** Fraction of traffic blocked as malicious (0–1). */
+  blockRate: number;
+  /** Inspection latency added per request in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of WAF failure (fail-open passes all traffic). */
+  failureRate: number;
+}
+
+export interface GraphDBConfig {
+  /** Max graph traversal queries per second. */
+  queryCapacity: number;
+  /** Max write operations (node/edge mutations) per second. */
+  writeCapacity: number;
+  /** Base query latency in ms. */
+  latencyMs: number;
+  /** Probability 0–1 of query failure. */
+  failureRate: number;
+}
+
 export interface AgentOrchestratorConfig {
   /** Max number of agent loops that can run simultaneously. */
   maxConcurrentAgents: number;
@@ -358,7 +382,9 @@ export type NodeConfig =
   | { nodeType: NodeType.AgentOrchestrator; config: AgentOrchestratorConfig }
   // v2.1
   | { nodeType: NodeType.DNS;               config: DNSConfig }
-  | { nodeType: NodeType.NoSQLStore;        config: NoSQLStoreConfig };
+  | { nodeType: NodeType.NoSQLStore;        config: NoSQLStoreConfig }
+  | { nodeType: NodeType.WAF;               config: WAFConfig }
+  | { nodeType: NodeType.GraphDB;           config: GraphDBConfig };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STRUCTURAL NODES

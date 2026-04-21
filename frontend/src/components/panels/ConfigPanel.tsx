@@ -10,7 +10,7 @@ import type {
   BaseNodeConfig, ClientConfig, LoadBalancerConfig, CacheConfig, CDNConfig, QueueConfig,
   ApiGatewayConfig, ServerlessConfig, WorkerConfig, PubSubConfig, StreamConfig,
   RateLimiterConfig, ObjectStoreConfig, ExternalServiceConfig, LLMGatewayConfig,
-  VectorDBConfig, AgentOrchestratorConfig, DNSConfig, NoSQLStoreConfig,
+  VectorDBConfig, AgentOrchestratorConfig, DNSConfig, NoSQLStoreConfig, WAFConfig, GraphDBConfig,
 } from '../../types/topology'
 import { NODE_DISPLAY, STRUCTURAL_DISPLAY } from '../canvas/nodeConfig'
 import { costStore } from '../../stores/CostStore'
@@ -417,6 +417,46 @@ function NoSQLStoreFields({ nodeId, cfg }: { nodeId: string; cfg: NoSQLStoreConf
   )
 }
 
+function WAFFields({ nodeId, cfg }: { nodeId: string; cfg: WAFConfig }) {
+  const patch = (p: Partial<WAFConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Inspection capacity (req/s)" hint="Max RPS the WAF can inspect before becoming a bottleneck">
+          <NumInput value={cfg.inspectionCapacity} onChange={v => patch({ inspectionCapacity: v })} min={1} />
+        </Field>
+        <Field label="Block rate" hint="Fraction of traffic blocked as malicious">
+          <RangeInput value={cfg.blockRate} onChange={v => patch({ blockRate: v })} />
+        </Field>
+        <Field label="Inspection latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={0} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate" hint="Fail-open: WAF failure passes all traffic through">
+          <RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} />
+        </Field>
+      </FieldGroup>
+    </>
+  )
+}
+
+function GraphDBFields({ nodeId, cfg }: { nodeId: string; cfg: GraphDBConfig }) {
+  const patch = (p: Partial<GraphDBConfig>) =>
+    runInAction(() => graphStore.updateNodeConfig(nodeId, { config: { ...cfg, ...p } } as any))
+  return (
+    <>
+      <FieldGroup>
+        <Field label="Query capacity (traversals/s)"><NumInput value={cfg.queryCapacity} onChange={v => patch({ queryCapacity: v })} min={1} /></Field>
+        <Field label="Write capacity (mutations/s)"><NumInput value={cfg.writeCapacity} onChange={v => patch({ writeCapacity: v })} min={1} /></Field>
+        <Field label="Query latency (ms)"><NumInput value={cfg.latencyMs} onChange={v => patch({ latencyMs: v })} min={1} /></Field>
+      </FieldGroup>
+      <FieldGroup>
+        <Field label="Failure rate"><RangeInput value={cfg.failureRate} onChange={v => patch({ failureRate: v })} /></Field>
+      </FieldGroup>
+    </>
+  )
+}
+
 // ── Structural node config (label + notes only) ───────────────────────────────
 
 function StructuralFields({ nodeId }: { nodeId: string }) {
@@ -468,6 +508,8 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
     [NodeType.AgentOrchestrator]: 0.500,
     [NodeType.DNS]:               0.008,
     [NodeType.NoSQLStore]:        0.095,
+    [NodeType.WAF]:               0.080,
+    [NodeType.GraphDB]:           0.350,
   }
   const rate = BASE_HR_HINT[nodeType]
 
@@ -577,6 +619,8 @@ const ConfigPanel = observer(() => {
       case NodeType.AgentOrchestrator: return <AgentOrchestratorFields nodeId={nodeId!} cfg={node.config as AgentOrchestratorConfig} />
       case NodeType.DNS:               return <DNSFields nodeId={nodeId!} cfg={node.config as DNSConfig} />
       case NodeType.NoSQLStore:        return <NoSQLStoreFields nodeId={nodeId!} cfg={node.config as NoSQLStoreConfig} />
+      case NodeType.WAF:               return <WAFFields nodeId={nodeId!} cfg={node.config as WAFConfig} />
+      case NodeType.GraphDB:           return <GraphDBFields nodeId={nodeId!} cfg={node.config as GraphDBConfig} />
       default:                         return <BaseFields nodeId={nodeId!} cfg={node.config as BaseNodeConfig} />
     }
   }

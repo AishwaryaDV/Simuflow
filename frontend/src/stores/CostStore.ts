@@ -39,6 +39,8 @@ const BASE_HR: Partial<Record<NodeType, number>> = {
   [NodeType.AgentOrchestrator]: 0.5,
   [NodeType.DNS]: 0.008, // Route 53 hosted zone
   [NodeType.NoSQLStore]: 0.095, // DynamoDB on-demand base
+  [NodeType.WAF]: 0.08, // AWS WAF WebACL base
+  [NodeType.GraphDB]: 0.35, // Neptune db.r6g.large base
 };
 
 /** Approximate $/million requests for request-priced services. */
