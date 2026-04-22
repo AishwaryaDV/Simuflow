@@ -6,11 +6,12 @@
 
 import type { TopologySchema } from '../types/topology'
 
-import webApp        from '../presets/web_app.json'
-import cachedWebApp  from '../presets/cached_web_app.json'
-import urlShortener  from '../presets/url_shortener.json'
-import socialFeed    from '../presets/social_feed.json'
-import aiAgent       from '../presets/ai_agent.json'
+import webApp          from '../presets/web_app.json'
+import cachedWebApp    from '../presets/cached_web_app.json'
+import urlShortener    from '../presets/url_shortener.json'
+import socialFeed      from '../presets/social_feed.json'
+import videoStreaming  from '../presets/video_streaming.json'
+import aiAgent         from '../presets/ai_agent.json'
 
 export type TemplateCategory =
   | 'fundamentals'
@@ -191,10 +192,50 @@ export const TEMPLATES: Template[] = [
   {
     slug:        'video_streaming',
     name:        'Video Streaming Platform',
-    description: 'Media delivery with transcoding workers, CDN offload and multi-region object storage.',
+    description: 'Media delivery with distributed transcoding workers, multi-tier CDN offload and adaptive bitrate streaming.',
     category:    'distributed',
-    topology:    null,
-    details:     null,
+    topology:    videoStreaming.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'Distributing petabytes of video globally requires solving two distinct engineering problems: ' +
+        'the upload and transcoding pipeline (CPU-bound, async, fault-tolerant) and the streaming delivery ' +
+        'path (latency-sensitive, massively concurrent, CDN-dominated). A 2-hour 4K film is broken into ' +
+        '5-second segments and distributed across hundreds of parallel transcoding workers, producing both ' +
+        'HLS and DASH manifests at every bitrate. The CDN absorbs 92% of all playback traffic before it ' +
+        'ever reaches origin — making hit rate the single most important operational lever.',
+      components: [
+        { name: 'API Gateway',
+          role: 'Entry point for both uploads and streaming manifest requests. Writes raw files to S3 and enqueues transcoding jobs.' },
+        { name: 'Message Queue',
+          role: 'Durable job buffer between upload and transcoding. Decouples ingestion from processing — queue depth spikes during upload bursts without dropping jobs.' },
+        { name: 'Media Processor',
+          role: 'Distributed FFMPEG worker pool. Reads raw segments from S3, transcodes to HLS + DASH at multiple bitrates in parallel, writes finished segments back to S3.' },
+        { name: 'DNS',
+          role: '300s TTL routes users to the nearest CDN PoP. Anycast routing keeps resolution latency under 5ms globally.' },
+        { name: 'CDN (Multi-tier)',
+          role: '92% hit rate across edge + mid-tier. Cache request collapsing ensures a viral video premiere only generates 1 origin fetch per edge, not 1 per viewer.' },
+        { name: 'Load Balancer',
+          role: 'Routes CDN cache-miss manifest requests to the API tier. Segment fetches bypass it entirely — CDN pulls segments directly from S3.' },
+        { name: 'Raw Uploads (S3)',
+          role: 'Source uploads before processing. Object lifecycle policies move these to Glacier after transcoding completes, cutting storage costs by ~80%.' },
+        { name: 'Video Segments (S3)',
+          role: 'Hot origin for all transcoded segments across every bitrate and format. 99.999% durability. The CDN pulls from here on cache miss.' },
+        { name: 'Video Metadata (DB)',
+          role: 'Stores manifest URLs, available bitrates, processing status, and video attributes. Queried on every manifest request.' },
+      ],
+      watchFor: [
+        'Message Queue depth — rises when upload bursts outpace transcoding worker throughput.',
+        'Media Processor utilisation — the encoding ceiling; each worker handles one segment at a time.',
+        'CDN hit rate — the most powerful cost lever. At 0.92 only 8% of streams hit origin.',
+        'Video Segments read throughput — the hot path under high concurrent streaming load.',
+        'CDN → origin fetch volume — should be tiny at steady state; a spike signals a cache miss flood.',
+      ],
+      tryThis:
+        'Simulate a live premiere: raise Client RPS to 5,000 and drop CDN hitRate to 0.4 ' +
+        '(new content, nothing cached yet). Watch the Video Segments object store read throughput ' +
+        'saturate as every viewer triggers an origin fetch. Then restore hitRate to 0.92 to see ' +
+        'the CDN absorb 92% of load and the origin return to idle.',
+    },
   },
   {
     slug:        'ride_sharing',

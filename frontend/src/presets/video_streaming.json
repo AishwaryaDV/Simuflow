@@ -1,0 +1,125 @@
+{
+  "slug": "video_streaming",
+  "name": "Video Streaming Platform",
+  "description": "Media logistics architecture with distributed transcoding, multi-tier CDN delivery and adaptive bitrate streaming.",
+  "category": "distributed",
+  "topology": {
+    "version": "2.0",
+    "nodes": [
+      {
+        "id": "client-1",
+        "label": "Users",
+        "position": { "x": 460, "y": 20 },
+        "nodeType": "client",
+        "config": { "rps": 1000, "burst": true }
+      },
+
+      {
+        "id": "apigw-1",
+        "label": "API Gateway",
+        "position": { "x": 140, "y": 185 },
+        "nodeType": "api_gateway",
+        "config": { "capacity": 30000, "latencyMs": 5, "failureRate": 0.001, "timeoutMs": 5000, "rateLimit": 0, "authOverheadMs": 5 }
+      },
+      {
+        "id": "queue-1",
+        "label": "Message Queue",
+        "position": { "x": 140, "y": 335 },
+        "nodeType": "queue",
+        "config": { "delayMs": 500, "maxDepth": 50000 }
+      },
+      {
+        "id": "worker-1",
+        "label": "Media Processor",
+        "position": { "x": 140, "y": 480 },
+        "nodeType": "worker",
+        "config": { "throughput": 300, "processingMs": 8000, "failureRate": 0.01, "retries": 3, "concurrency": 80 }
+      },
+
+      {
+        "id": "dns-1",
+        "label": "DNS",
+        "position": { "x": 460, "y": 185 },
+        "nodeType": "dns",
+        "config": { "ttlSeconds": 300, "regions": 6, "latencyMs": 5, "failureRate": 0.0001 }
+      },
+      {
+        "id": "cdn-1",
+        "label": "CDN (Multi-tier)",
+        "position": { "x": 650, "y": 185 },
+        "nodeType": "cdn",
+        "config": { "capacity": 500000, "latencyMs": 8, "failureRate": 0, "timeoutMs": 5000, "hitRate": 0.92 }
+      },
+      {
+        "id": "lb-1",
+        "label": "Load Balancer",
+        "position": { "x": 845, "y": 185 },
+        "nodeType": "load_balancer",
+        "config": { "capacity": 50000, "latencyMs": 1, "failureRate": 0, "timeoutMs": 5000, "strategy": "round_robin", "replicas": 4 }
+      },
+
+      {
+        "id": "obj-raw",
+        "label": "Raw Uploads (S3)",
+        "position": { "x": 460, "y": 435 },
+        "nodeType": "object_store",
+        "config": { "readThroughputMbps": 20000, "writeThroughputMbps": 10000, "latencyMs": 30, "failureRate": 0.0001, "maxObjectSizeMb": 0 }
+      },
+      {
+        "id": "obj-seg",
+        "label": "Video Segments (S3)",
+        "position": { "x": 655, "y": 435 },
+        "nodeType": "object_store",
+        "config": { "readThroughputMbps": 100000, "writeThroughputMbps": 30000, "latencyMs": 15, "failureRate": 0.0001, "maxObjectSizeMb": 0 }
+      },
+      {
+        "id": "db-meta",
+        "label": "Video Metadata",
+        "position": { "x": 845, "y": 435 },
+        "nodeType": "database",
+        "config": { "capacity": 8000, "latencyMs": 10, "failureRate": 0.001, "timeoutMs": 5000 }
+      }
+    ],
+    "edges": [
+      { "id": "e1",  "sourceId": "client-1", "targetId": "apigw-1", "label": "upload" },
+      { "id": "e2",  "sourceId": "client-1", "targetId": "dns-1" },
+      { "id": "e3",  "sourceId": "dns-1",    "targetId": "cdn-1" },
+      { "id": "e4",  "sourceId": "cdn-1",    "targetId": "lb-1",     "label": "cache miss" },
+      { "id": "e5",  "sourceId": "cdn-1",    "targetId": "obj-seg",  "label": "origin fetch" },
+      { "id": "e6",  "sourceId": "lb-1",     "targetId": "apigw-1",  "label": "manifest request" },
+      { "id": "e7",  "sourceId": "apigw-1",  "targetId": "obj-raw",  "label": "upload" },
+      { "id": "e8",  "sourceId": "apigw-1",  "targetId": "queue-1",  "label": "enqueue job" },
+      { "id": "e9",  "sourceId": "apigw-1",  "targetId": "db-meta",  "label": "write metadata" },
+      { "id": "e10", "sourceId": "queue-1",  "targetId": "worker-1", "label": "transcode job" },
+      { "id": "e11", "sourceId": "worker-1", "targetId": "obj-raw",  "label": "read source" },
+      { "id": "e12", "sourceId": "worker-1", "targetId": "obj-seg",  "label": "write" }
+    ],
+    "structuralNodes": [
+      {
+        "id": "grp-ingest",
+        "label": "Ingestion & Processing",
+        "structuralType": "vpc",
+        "position": { "x": 60, "y": 125 },
+        "width": 240,
+        "height": 440
+      },
+      {
+        "id": "grp-cdn",
+        "label": "Delivery & CDN Layer",
+        "structuralType": "vpc",
+        "position": { "x": 390, "y": 125 },
+        "width": 580,
+        "height": 165
+      },
+      {
+        "id": "grp-storage",
+        "label": "Media & Metadata Storage",
+        "structuralType": "vpc",
+        "position": { "x": 390, "y": 375 },
+        "width": 580,
+        "height": 175
+      }
+    ],
+    "viewport": { "x": 10, "y": 10, "zoom": 0.78 }
+  }
+}
