@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
 import { simulationStore } from '../../stores/SimulationStore'
+import { validationStore } from '../../stores/ValidationStore'
 import { uiStore } from '../../stores/UIStore'
 import { SimulationStatus } from '../../types/topology'
 import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown } from 'lucide-react'
@@ -41,6 +42,7 @@ const Toolbar = observer(() => {
           if (!isIdle) simulationStore.stop()
           graphStore.clearCanvas()
           uiStore.setLoadedTemplate(null)
+          validationStore.reset()
         })
       },
     ))
@@ -48,10 +50,12 @@ const Toolbar = observer(() => {
 
   const handlePlay = useCallback(() => {
     if (graphStore.nodeCount === 0) return
-    runInAction(() => {
-      if (isPaused) simulationStore.resume()
-      else simulationStore.start()
-    })
+    if (isPaused) {
+      runInAction(() => simulationStore.resume())
+      return
+    }
+    // Run topology validation before starting — shows error modal or warning sheet if needed
+    validationStore.validate(() => runInAction(() => simulationStore.start()))
   }, [isPaused])
 
   const handlePause  = useCallback(() => runInAction(() => simulationStore.pause()), [])

@@ -1,8 +1,9 @@
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { useState, useEffect } from 'react'
-import { Trash2, DollarSign } from 'lucide-react'
+import { Trash2, DollarSign, Info } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
+import { validationStore } from '../../stores/ValidationStore'
 import {
   NodeType, LBStrategy, RateLimitAlgorithm, RejectBehavior,
 } from '../../types/topology'
@@ -610,6 +611,38 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
   )
 }
 
+// ── Advisory hints for selected node ─────────────────────────────────────────
+
+const NodeAdvisories = observer(({ nodeId }: { nodeId: string }) => {
+  const advisories = validationStore.nodeAdvisories(nodeId)
+  if (advisories.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Info size={10} className="text-blue-400" />
+        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">
+          Advisories
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {advisories.map(a => (
+          <div
+            key={a.ruleId}
+            className="flex gap-2 px-3 py-2.5 rounded-xl bg-blue-500/5 border border-blue-500/20"
+          >
+            <div className="w-1 shrink-0 rounded-full bg-blue-400/50 self-stretch" />
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <p className="text-[11px] font-semibold text-blue-300">{a.title}</p>
+              <p className="text-[10px] text-app-text-3 leading-relaxed">{a.message}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+})
+
 // ── Main ConfigPanel ──────────────────────────────────────────────────────────
 
 const ConfigPanel = observer(() => {
@@ -723,6 +756,7 @@ const ConfigPanel = observer(() => {
         </FieldGroup>
         {renderConfigFields()}
         <CostPlaceholder nodeType={node.nodeType} />
+        <NodeAdvisories nodeId={nodeId!} />
       </div>
     </aside>
   )

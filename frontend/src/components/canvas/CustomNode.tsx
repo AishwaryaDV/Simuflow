@@ -1,8 +1,9 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { observer } from 'mobx-react-lite'
-import { NodeHealth, NodeType } from '../../types/topology'
+import { NodeHealth, NodeType, SimulationStatus } from '../../types/topology'
 import type { SimNode } from '../../types/topology'
 import { simulationStore } from '../../stores/SimulationStore'
+import { validationStore } from '../../stores/ValidationStore'
 import { NODE_DISPLAY } from './nodeConfig'
 
 /** Nodes that generate traffic — utilisation % is meaningless for these */
@@ -26,7 +27,22 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
   const display = NODE_DISPLAY[simNode.nodeType]
   const runtime = simulationStore.nodeStates.get(simNode.id)
   const health = runtime?.health ?? NodeHealth.Idle
-  const ringClass = HEALTH_RING[health]
+  const isRunning = simulationStore.status === SimulationStatus.Running
+
+  // Ring priority: when idle show validation rings; when running show health rings
+  let ringClass: string
+  if (isRunning) {
+    ringClass = HEALTH_RING[health]
+  } else {
+    const severity = validationStore.nodeValidationSeverity(simNode.id)
+    if (severity === 'error')   ringClass = 'ring-red-500'
+    else if (severity === 'warning') ringClass = 'ring-yellow-400'
+    else                        ringClass = 'ring-transparent'
+  }
+
+  // Small yellow dot badge: running simulation, node has a validation warning
+  const showWarnDot = isRunning &&
+    validationStore.nodeValidationSeverity(simNode.id) === 'warning'
 
   const Icon = display.icon
 
@@ -57,6 +73,11 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
           <span className="absolute -top-2 -right-2 bg-app-elevated border border-app-border text-app-text text-[9px] font-bold rounded-full px-1 py-0.5 leading-none">
             {Math.round(runtime.utilisationPct)}%
           </span>
+        )}
+
+        {/* Yellow warning dot — running simulation, node has a pre-flight warning */}
+        {showWarnDot && (
+          <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-yellow-400 border-2 border-app-bg" />
         )}
       </div>
 

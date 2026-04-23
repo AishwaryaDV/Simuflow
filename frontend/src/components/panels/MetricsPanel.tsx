@@ -4,11 +4,13 @@ import { runInAction } from 'mobx'
 import {
   AreaChart, Area, ResponsiveContainer, Tooltip,
 } from 'recharts'
-import { ChevronUp, ChevronDown, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react'
+import { ChevronUp, ChevronDown, AlertTriangle, DollarSign, TrendingUp, Info } from 'lucide-react'
 import { simulationStore } from '../../stores/SimulationStore'
 import { costStore } from '../../stores/CostStore'
 import { graphStore } from '../../stores/GraphStore'
+import { validationStore } from '../../stores/ValidationStore'
 import { SimulationStatus } from '../../types/topology'
+import type { ValidationIssue } from '../../validation/types'
 
 // ── Sparkline ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ function LatencyStat({ label, value, warn }: { label: string; value: number; war
 const MetricsPanel = observer(() => {
   const [metricsOpen, setMetricsOpen] = useState(true)
   const [costOpen, setCostOpen] = useState(true)
+  const [advisoriesOpen, setAdvisoriesOpen] = useState(true)
   const { status, globalMetrics, metricsHistory, bottleneckNodes } = simulationStore
 
   if (status === SimulationStatus.Idle) return null
@@ -317,6 +320,64 @@ const MetricsPanel = observer(() => {
           </div>
         )}
       </div>
+
+      {/* ── Advisories strip ───────────────────────────────────────────────── */}
+      {validationStore.report?.advisories && validationStore.report.advisories.length > 0 && (
+        <>
+          <div className="h-px bg-app-border" />
+          <button
+            onClick={() => setAdvisoriesOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-app-elevated/50 transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <Info size={11} className="text-blue-400" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">
+                Advisories
+              </span>
+              <span className="text-[10px] text-blue-400/60 font-medium">
+                ({validationStore.report.advisories.length})
+              </span>
+            </div>
+            {advisoriesOpen
+              ? <ChevronDown size={13} className="text-app-text-3" />
+              : <ChevronUp size={13} className="text-app-text-3" />
+            }
+          </button>
+          {advisoriesOpen && (
+            <div className="px-4 pb-3 flex flex-col gap-2">
+              {validationStore.report.advisories.map((a: ValidationIssue) => {
+                const nodeLabels = a.affectedNodeIds
+                  .map((id: string) => graphStore.nodes.get(id)?.label ?? id)
+                  .filter(Boolean)
+                return (
+                  <div
+                    key={a.ruleId}
+                    className="flex gap-2 px-3 py-2 rounded-xl bg-blue-500/5 border border-blue-500/20"
+                  >
+                    <div className="w-1 shrink-0 rounded-full bg-blue-400/50 self-stretch" />
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <p className="text-[11px] font-semibold text-blue-300">{a.title}</p>
+                      <p className="text-[10px] text-app-text-3 leading-relaxed">{a.message}</p>
+                      {nodeLabels.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {nodeLabels.map((label: string) => (
+                            <span
+                              key={label}
+                              className="text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 })
