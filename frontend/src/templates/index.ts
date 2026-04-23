@@ -11,6 +11,7 @@ import cachedWebApp    from '../presets/cached_web_app.json'
 import urlShortener    from '../presets/url_shortener.json'
 import socialFeed      from '../presets/social_feed.json'
 import videoStreaming  from '../presets/video_streaming.json'
+import rideSharing     from '../presets/ride_sharing.json'
 import aiAgent         from '../presets/ai_agent.json'
 
 export type TemplateCategory =
@@ -240,10 +241,54 @@ export const TEMPLATES: Template[] = [
   {
     slug:        'ride_sharing',
     name:        'Real-Time Ride Sharing',
-    description: 'Geospatial matching system with live location streams and dynamic pricing services.',
+    description: 'Geospatial mobility architecture with sub-millisecond driver lookup, WebSocket location streams and greedy low-latency matching.',
     category:    'distributed',
-    topology:    null,
-    details:     null,
+    topology:    rideSharing.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'Ride sharing is a high-concurrency, location-aware matching problem with hard latency constraints. ' +
+        'Driver GPS updates arrive every 3 seconds via persistent WebSocket connections, written directly ' +
+        'into a Redis Geospatial index that supports sub-millisecond GEORADIUS queries. When a rider requests a ride, ' +
+        'the Matching Service runs a greedy algorithm — finding a good-enough nearby driver in under 2 seconds ' +
+        'rather than globally optimal in 10+ seconds. Dynamic Pricing uses Google S2 cell decomposition to ' +
+        'calculate surge consistently across geographic zones, and all trip events fan out asynchronously ' +
+        'so analytics never block the critical matching path.',
+      components: [
+        { name: 'Rider App',
+          role: 'Issues ride requests and receives real-time driver position updates via WebSocket.' },
+        { name: 'Driver App',
+          role: 'Streams GPS coordinates every 3 seconds via WebSocket. Receives match offers and navigation instructions.' },
+        { name: 'WebSocket Gateway',
+          role: 'Maintains persistent bidirectional connections to all active drivers and riders. ' +
+                'Backed by a distributed pub/sub so any gateway node can route a message to any connected client.' },
+        { name: 'API Gateway',
+          role: 'Handles REST traffic — account management, trip history, payments. Also accepts driver GPS updates as a fallback.' },
+        { name: 'Matching Service',
+          role: 'Greedy matcher — queries Redis Geo for nearby drivers and assigns the closest available one within 2 seconds. ' +
+                'Uses idempotent request IDs for at-least-once delivery safety.' },
+        { name: 'Dynamic Pricing (S2)',
+          role: 'Google S2 cell decomposition for surge calculation. Aggregates supply/demand per geographic cell ' +
+                'for consistent pricing across a neighbourhood rather than per-radius averages.' },
+        { name: 'Trip Events Stream',
+          role: 'Async fan-out for all trip lifecycle events. Decouples the matching hot path from analytics, billing and notifications.' },
+        { name: 'Analytics Worker',
+          role: 'Consumes trip events for demand forecasting, driver incentive calculation and operational dashboards.' },
+        { name: 'Redis Geo Cache',
+          role: 'Primary index for active driver locations. GEOADD writes on every GPS update, GEORADIUS queries on every match request. ' +
+                'Sharded by city ID — driver locations across cities never share a shard.' },
+      ],
+      watchFor: [
+        'WebSocket Gateway utilisation — scales with concurrent active drivers, not RPS. Saturates at peak commute hours.',
+        'Matching Service latency — the 2-second SLA is the user-facing quality bar; p99 above 1.5s signals trouble.',
+        'Redis Geo utilisation — every GPS update (300 RPS from Driver App) and every match request hits Redis.',
+        'Dynamic Pricing capacity — surge calculation happens on every match; queues here add directly to match latency.',
+        'Trip Events Stream depth — should drain near-instantly; backpressure means analytics lag is growing.',
+      ],
+      tryThis:
+        'Simulate rush hour: raise both Rider App and Driver App RPS to 2,000. Watch Matching Service ' +
+        'utilisation climb and match latency approach the 2-second SLA. Then drop Redis Geo capacity to ' +
+        '5,000 to model a degraded Redis cluster — observe how proximity queries back up and matching collapses.',
+    },
   },
 
   // ── Data & Analytics ─────────────────────────────────────────────────────────

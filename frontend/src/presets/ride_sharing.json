@@ -1,0 +1,129 @@
+{
+  "slug": "ride_sharing",
+  "name": "Real-Time Ride Sharing",
+  "description": "Geospatial mobility architecture with sub-millisecond driver lookup, WebSocket location streams and greedy low-latency matching.",
+  "category": "distributed",
+  "topology": {
+    "version": "2.0",
+    "nodes": [
+      {
+        "id": "rider-app",
+        "label": "Rider App",
+        "position": { "x": 190, "y": 20 },
+        "nodeType": "client",
+        "config": { "rps": 400, "burst": true }
+      },
+      {
+        "id": "driver-app",
+        "label": "Driver App",
+        "position": { "x": 400, "y": 20 },
+        "nodeType": "client",
+        "config": { "rps": 300, "burst": false }
+      },
+
+      {
+        "id": "ws-gw",
+        "label": "WebSocket Gateway",
+        "position": { "x": 40, "y": 235 },
+        "nodeType": "microservice",
+        "config": { "capacity": 50000, "latencyMs": 5, "failureRate": 0.001, "timeoutMs": 30000 }
+      },
+
+      {
+        "id": "api-gw",
+        "label": "API Gateway",
+        "position": { "x": 260, "y": 235 },
+        "nodeType": "api_gateway",
+        "config": { "capacity": 20000, "latencyMs": 5, "failureRate": 0.001, "timeoutMs": 5000, "rateLimit": 0, "authOverheadMs": 5 }
+      },
+
+      {
+        "id": "matching-svc",
+        "label": "Matching Service",
+        "position": { "x": 490, "y": 215 },
+        "nodeType": "microservice",
+        "config": { "capacity": 5000, "latencyMs": 150, "failureRate": 0.002, "timeoutMs": 2000 }
+      },
+      {
+        "id": "pricing-svc",
+        "label": "Dynamic Pricing (S2)",
+        "position": { "x": 660, "y": 215 },
+        "nodeType": "microservice",
+        "config": { "capacity": 3000, "latencyMs": 80, "failureRate": 0.002, "timeoutMs": 1000 }
+      },
+
+      {
+        "id": "trip-stream",
+        "label": "Trip Events Stream",
+        "position": { "x": 210, "y": 445 },
+        "nodeType": "stream",
+        "config": { "partitions": 8, "throughput": 20000, "retentionMs": 86400000, "consumerGroups": 2, "failureRate": 0 }
+      },
+      {
+        "id": "analytics-worker",
+        "label": "Analytics Worker",
+        "position": { "x": 350, "y": 445 },
+        "nodeType": "worker",
+        "config": { "throughput": 500, "processingMs": 1000, "failureRate": 0.01, "retries": 3, "concurrency": 10 }
+      },
+
+      {
+        "id": "redis-geo",
+        "label": "Redis Geo Cache",
+        "position": { "x": 540, "y": 445 },
+        "nodeType": "cache",
+        "config": { "capacity": 30000, "latencyMs": 1, "failureRate": 0.001, "timeoutMs": 500, "hitRate": 0.95 }
+      }
+    ],
+    "edges": [
+      { "id": "e1",  "sourceId": "rider-app",       "targetId": "ws-gw",          "label": "WebSocket" },
+      { "id": "e2",  "sourceId": "driver-app",       "targetId": "ws-gw",          "label": "WebSocket" },
+      { "id": "e3",  "sourceId": "rider-app",        "targetId": "api-gw" },
+      { "id": "e4",  "sourceId": "driver-app",       "targetId": "api-gw",         "label": "GPS update" },
+      { "id": "e5",  "sourceId": "ws-gw",            "targetId": "matching-svc",   "label": "ride request" },
+      { "id": "e6",  "sourceId": "ws-gw",            "targetId": "redis-geo",      "label": "location push" },
+      { "id": "e7",  "sourceId": "api-gw",           "targetId": "matching-svc" },
+      { "id": "e8",  "sourceId": "api-gw",           "targetId": "trip-stream",    "label": "ride data" },
+      { "id": "e9",  "sourceId": "matching-svc",     "targetId": "redis-geo",      "label": "query proximity" },
+      { "id": "e10", "sourceId": "matching-svc",     "targetId": "pricing-svc",    "label": "surge check" },
+      { "id": "e11", "sourceId": "matching-svc",     "targetId": "ws-gw",          "label": "match offer" },
+      { "id": "e12", "sourceId": "pricing-svc",      "targetId": "redis-geo",      "label": "demand query" },
+      { "id": "e13", "sourceId": "trip-stream",      "targetId": "analytics-worker" }
+    ],
+    "structuralNodes": [
+      {
+        "id": "grp-edge",
+        "label": "Edge & API Gateway",
+        "structuralType": "vpc",
+        "position": { "x": 160, "y": 165 },
+        "width": 230,
+        "height": 155
+      },
+      {
+        "id": "grp-matching",
+        "label": "Real-time Matching Hub",
+        "structuralType": "vpc",
+        "position": { "x": 420, "y": 155 },
+        "width": 330,
+        "height": 165
+      },
+      {
+        "id": "grp-async",
+        "label": "Async Ops & Analytics",
+        "structuralType": "vpc",
+        "position": { "x": 160, "y": 390 },
+        "width": 270,
+        "height": 150
+      },
+      {
+        "id": "grp-geo",
+        "label": "Geospatial State & Cache",
+        "structuralType": "vpc",
+        "position": { "x": 450, "y": 390 },
+        "width": 260,
+        "height": 150
+      }
+    ],
+    "viewport": { "x": 15, "y": 10, "zoom": 0.88 }
+  }
+}
