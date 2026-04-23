@@ -17,7 +17,6 @@ import aiAgent         from '../presets/ai_agent.json'
 export type TemplateCategory =
   | 'fundamentals'
   | 'distributed'
-  | 'data'
   | 'ai'
 
 export interface TemplateDetails {
@@ -39,7 +38,6 @@ export interface Template {
 export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   fundamentals: 'Fundamentals',
   distributed:  'Distributed Systems',
-  data:         'Data & Analytics',
   ai:           'AI & Agents',
 }
 
@@ -292,15 +290,6 @@ export const TEMPLATES: Template[] = [
   },
 
   // ── Data & Analytics ─────────────────────────────────────────────────────────
-  {
-    slug:        'data_analytics',
-    name:        'Modern Data Analytics Pipeline',
-    description: 'Stream ingestion → ETL workers → object store data lake → analytical warehouse.',
-    category:    'data',
-    topology:    null,
-    details:     null,
-  },
-
   // ── AI & Agents ───────────────────────────────────────────────────────────────
   {
     slug:        'ai_agent',
@@ -357,5 +346,5 @@ export const TEMPLATES: Template[] = [
 
 export const TEMPLATES_BY_CATEGORY = TEMPLATES.reduce<Record<TemplateCategory, Template[]>>(
   (acc, t) => { acc[t.category].push(t); return acc },
-  { fundamentals: [], distributed: [], data: [], ai: [] },
+  { fundamentals: [], distributed: [], ai: [] },
 )

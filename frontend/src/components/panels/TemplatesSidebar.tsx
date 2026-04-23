@@ -35,7 +35,7 @@ const TEMPLATE_ICONS: Record<string, LucideIcon> = {
 
 const ICON_STYLE = 'text-app-accent bg-app-accent/10'
 
-const CATEGORY_ORDER: TemplateCategory[] = ['fundamentals', 'distributed', 'data', 'ai']
+const CATEGORY_ORDER: TemplateCategory[] = ['fundamentals', 'distributed', 'ai']
 
 // ── Template card ──────────────────────────────────────────────────────────────
 
