@@ -54,7 +54,7 @@ function Sparkline({ data, dataKey, color, label, value, unit }: {
                 borderRadius: 8, fontSize: 11, padding: '4px 8px',
               }}
               labelStyle={{ display: 'none' }}
-              formatter={(v: number) => [`${Math.round(v)}${unit ?? ''}`, label]}
+              formatter={(v) => [`${Math.round(Number(v ?? 0))}${unit ?? ''}`, label]}
             />
           </AreaChart>
         </ResponsiveContainer>

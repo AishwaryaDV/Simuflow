@@ -421,7 +421,7 @@ const WARNING_RULES: ValidationRule[] = [
   {
     id:       'WARN_LB_REPLICA_MISMATCH',
     severity: 'warning',
-    title:    'Load Balancer replica count doesn't match outgoing edges',
+    title:    "Load Balancer replica count doesn't match outgoing edges",
     check(ctx) {
       const issues: ValidationIssue[] = []
       ctx.nodes.forEach((node, id) => {
@@ -445,7 +445,7 @@ const WARNING_RULES: ValidationRule[] = [
   {
     id:       'WARN_PUBSUB_SUBSCRIBER_MISMATCH',
     severity: 'warning',
-    title:    'Pub/Sub subscriber count doesn't match outgoing edges',
+    title:    "Pub/Sub subscriber count doesn't match outgoing edges",
     check(ctx) {
       const issues: ValidationIssue[] = []
       ctx.nodes.forEach((node, id) => {
@@ -592,7 +592,6 @@ const ADVISORY_RULES: ValidationRule[] = [
 
         incomingOrchestrators.forEach(orch => {
           if (!orch) return
-          const maxAgents  = (orch.config as any).maxConcurrentAgents ?? 1
           const maxSteps   = (orch.config as any).maxSteps ?? 1
           const clientRps  = [...ctx.nodes.values()]
             .filter(n => n.nodeType === NodeType.Client)
