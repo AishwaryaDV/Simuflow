@@ -23,7 +23,8 @@ import { getCursorForMode } from './CanvasToolbar'
 import CanvasToolbar from './CanvasToolbar'
 import type { CustomNodeData } from './CustomNode'
 import type { StructuralRFData } from './StructuralNodeComponent'
-import { NodeType, StructuralNodeType } from '../../types/topology'
+import { NodeType, StructuralNodeType, SimulationStatus } from '../../types/topology'
+import { simulationStore } from '../../stores/SimulationStore'
 
 const SNAP_GRID: [number, number] = [20, 20]
 const SIM_TYPES    = new Set(Object.values(NodeType))
@@ -253,10 +254,19 @@ const CanvasPanel = observer(() => {
         y: Math.round(raw.y / SNAP_GRID[1]) * SNAP_GRID[1],
       }
 
+      const chaosId = e.dataTransfer.getData('application/simuflow-chaos-id')
+
       if (simType && SIM_TYPES.has(simType)) {
         runInAction(() => graphStore.addNode(createDefaultNode(simType, position)))
       } else if (structType && STRUCT_TYPES.has(structType)) {
         runInAction(() => graphStore.addStructuralNode(createDefaultStructuralNode(structType, position)))
+      } else if (chaosId) {
+        const isRunning = simulationStore.status === SimulationStatus.Running ||
+                          simulationStore.status === SimulationStatus.Chaos
+        if (!isRunning) {
+          runInAction(() => uiStore.showToast('Start simulation to inject chaos'))
+        }
+        // Inject flow (target picker + config) wired in Phase 3
       }
     },
     [screenToFlowPosition],

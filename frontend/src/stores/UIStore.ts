@@ -40,6 +40,8 @@ class UIStore {
   loadedTemplateSlug:   string | null  = _persistedSlug
   templateDetailsOpen:  boolean        = false
   confirm: ConfirmState = { open: false, title: '', message: '', onConfirm: () => {}, danger: false }
+  toast:   { message: string; visible: boolean } = { message: '', visible: false }
+  sidebarCollapsed: boolean = false
 
   constructor() {
     makeObservable(this, {
@@ -51,6 +53,8 @@ class UIStore {
       loadedTemplateSlug:   observable,
       templateDetailsOpen:  observable,
       confirm:              observable,
+      toast:                observable,
+      sidebarCollapsed:     observable,
       templateMode:         computed,
       togglePanel:        action,
       openPanel:          action,
@@ -66,6 +70,9 @@ class UIStore {
       showTemplatesList:    action,
       openConfirm:          action,
       closeConfirm:         action,
+      showToast:            action,
+      clearToast:           action,
+      toggleSidebar:        action,
     })
   }
 
@@ -125,6 +132,24 @@ class UIStore {
 
   closeConfirm() {
     this.confirm = { ...this.confirm, open: false }
+  }
+
+  private _toastTimer: ReturnType<typeof setTimeout> | null = null
+
+  showToast(message: string) {
+    if (this._toastTimer) clearTimeout(this._toastTimer)
+    this.toast = { message, visible: true }
+    this._toastTimer = setTimeout(() => {
+      this.clearToast()
+    }, 3000)
+  }
+
+  clearToast() {
+    this.toast = { ...this.toast, visible: false }
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed
   }
 
   /** Open the templates sidebar and always land on the list view. */

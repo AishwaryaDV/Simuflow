@@ -12,6 +12,7 @@ import TemplateBadge from '../canvas/TemplateBadge'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import ValidationErrorModal from '../ui/ValidationErrorModal'
 import ValidationWarningSheet from '../ui/ValidationWarningSheet'
+import Toast from '../ui/Toast'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
@@ -39,6 +40,7 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
       <ConfirmDialog />
       <ValidationErrorModal />
       <ValidationWarningSheet />
+      <Toast />
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-app-bg">
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
