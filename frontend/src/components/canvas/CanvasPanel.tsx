@@ -25,6 +25,8 @@ import type { CustomNodeData } from './CustomNode'
 import type { StructuralRFData } from './StructuralNodeComponent'
 import { NodeType, StructuralNodeType, SimulationStatus } from '../../types/topology'
 import { simulationStore } from '../../stores/SimulationStore'
+import ChaosContextMenu from './ChaosContextMenu'
+import type { ContextMenuTarget } from './ChaosContextMenu'
 
 const SNAP_GRID: [number, number] = [20, 20]
 const SIM_TYPES    = new Set(Object.values(NodeType))
@@ -55,6 +57,7 @@ const CanvasPanel = observer(() => {
   const mode = uiStore.canvasMode
   // Click-to-connect state: first click sets pending source
   const [pendingSource, setPendingSource] = useState<string | null>(null)
+  const [chaosMenu, setChaosMenu]         = useState<ContextMenuTarget | null>(null)
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
@@ -236,6 +239,25 @@ const CanvasPanel = observer(() => {
     [mode],
   )
 
+  // ── Chaos context menus ───────────────────────────────────────────────────
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
+    e.preventDefault()
+    const isRunning = simulationStore.status === SimulationStatus.Running ||
+                      simulationStore.status === SimulationStatus.Chaos
+    if (!isRunning) return
+    const simNode = graphStore.nodes.get(node.id)
+    if (!simNode) return
+    setChaosMenu({ type: 'node', targetId: node.id, nodeType: simNode.nodeType, x: e.clientX, y: e.clientY })
+  }, [])
+
+  const onEdgeContextMenu = useCallback((e: React.MouseEvent, edge: Edge) => {
+    e.preventDefault()
+    const isRunning = simulationStore.status === SimulationStatus.Running ||
+                      simulationStore.status === SimulationStatus.Chaos
+    if (!isRunning) return
+    setChaosMenu({ type: 'edge', targetId: edge.id, x: e.clientX, y: e.clientY })
+  }, [])
+
   // ── Drag-drop from NodeLibrary ────────────────────────────────────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -303,6 +325,13 @@ const CanvasPanel = observer(() => {
         </div>
       )}
 
+      {chaosMenu && (
+        <ChaosContextMenu
+          target={chaosMenu}
+          onClose={() => setChaosMenu(null)}
+        />
+      )}
+
       <ReactFlow
         nodes={[...rfStructNodes, ...rfSimNodes]}
         edges={rfEdges}
@@ -314,6 +343,8 @@ const CanvasPanel = observer(() => {
         onPaneClick={onPaneClick}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
         onMoveEnd={onMoveEnd}
         onDrop={onDrop}
         onDragOver={onDragOver}
