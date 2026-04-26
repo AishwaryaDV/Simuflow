@@ -110,13 +110,84 @@ export enum NodeHealth {
 }
 
 export enum ChaosScenarioId {
-  DbFailover     = "DB_FAILOVER",
-  CacheStampede  = "CACHE_STAMPEDE",
-  NetPartition   = "NET_PARTITION",
-  TrafficSpike   = "TRAFFIC_SPIKE",
-  Cascade        = "CASCADE",
-  SlowDependency = "SLOW_DEP",
+  // ── Infrastructure Failure ───────────────────────────────────────────────
+  InfraAzFailure          = "INFRA_AZ_FAILURE",
+  InfraDcOutage           = "INFRA_DC_OUTAGE",
+  InfraInstanceCrash      = "INFRA_INSTANCE_CRASH",
+  InfraInstanceDegradation= "INFRA_INSTANCE_DEGRADATION",
+  InfraDiskFailure        = "INFRA_DISK_FAILURE",
+  InfraDiskCorruption     = "INFRA_DISK_CORRUPTION",
+  InfraIopsThrottle       = "INFRA_IOPS_THROTTLE",
+  InfraCpuThrottle        = "INFRA_CPU_THROTTLE",
+
+  // ── Network Chaos ────────────────────────────────────────────────────────
+  NetPartition            = "NET_PARTITION",
+  NetCrossRegion          = "NET_CROSS_REGION",
+  NetPacketLoss           = "NET_PACKET_LOSS",
+  NetLatency              = "NET_LATENCY",
+  NetBandwidth            = "NET_BANDWIDTH",
+  NetFlapping             = "NET_FLAPPING",
+  NetLbFailure            = "NET_LB_FAILURE",
+  NetTlsCert              = "NET_TLS_CERT",
+  NetStickySkew           = "NET_STICKY_SKEW",
+  NetIdleTimeout          = "NET_IDLE_TIMEOUT",
+  NetDnsFailure           = "NET_DNS_FAILURE",
+  NetBlackhole            = "NET_BLACKHOLE",
+  NetNatFailure           = "NET_NAT_FAILURE",
+
+  // ── Application Level ────────────────────────────────────────────────────
+  AppMemoryLeak           = "APP_MEMORY_LEAK",
+  AppOomCrash             = "APP_OOM_CRASH",
+  AppThreadExhaustion     = "APP_THREAD_EXHAUSTION",
+  AppDeadlock             = "APP_DEADLOCK",
+  AppGcPause              = "APP_GC_PAUSE",
+  AppDepTimeout           = "APP_DEP_TIMEOUT",
+  AppLogOverload          = "APP_LOG_OVERLOAD",
+
+  // ── Traffic Chaos ────────────────────────────────────────────────────────
+  TrafficSpike            = "TRAFFIC_SPIKE",
+  TrafficRetryStorm       = "TRAFFIC_RETRY_STORM",
+  TrafficBotFlood         = "TRAFFIC_BOT_FLOOD",
+  TrafficThunderingHerd   = "TRAFFIC_THUNDERING_HERD",
+  TrafficPayloadExplosion = "TRAFFIC_PAYLOAD_EXPLOSION",
+
+  // ── Dependency Chaos ─────────────────────────────────────────────────────
+  DepThirdParty           = "DEP_THIRD_PARTY",
+  DepAuthOutage           = "DEP_AUTH_OUTAGE",
+  DepServiceDiscovery     = "DEP_SERVICE_DISCOVERY",
+  DepQueueBacklog         = "DEP_QUEUE_BACKLOG",
+
+  // ── Data Layer — Database ────────────────────────────────────────────────
+  DataDbPrimaryCrash      = "DATA_DB_PRIMARY_CRASH",
+  DataReplicaFailure      = "DATA_REPLICA_FAILURE",
+  DataReplicationLag      = "DATA_REPLICATION_LAG",
+  DataSplitBrain          = "DATA_SPLIT_BRAIN",
+  DataCorruption          = "DATA_CORRUPTION",
+  DataHotPartition        = "DATA_HOT_PARTITION",
+  DataConnPool            = "DATA_CONN_POOL",
+  DataLockContention      = "DATA_LOCK_CONTENTION",
+  DataNoisyNeighbour      = "DATA_NOISY_NEIGHBOUR",
+
+  // ── Data Layer — Cache ───────────────────────────────────────────────────
+  DataCachePoisoning      = "DATA_CACHE_POISONING",
+  DataCacheEvictionStorm  = "DATA_CACHE_EVICTION_STORM",
+  DataCacheOom            = "DATA_CACHE_OOM",
+  DataCachePersistence    = "DATA_CACHE_PERSISTENCE",
+  DataCacheReplicaDesync  = "DATA_CACHE_REPLICA_DESYNC",
+  DataCacheClusterPartition = "DATA_CACHE_CLUSTER_PARTITION",
+  DataCacheSentinelSplit  = "DATA_CACHE_SENTINEL_SPLIT",
 }
+
+export type ChaosCategory =
+  | 'infrastructure'
+  | 'network'
+  | 'application'
+  | 'traffic'
+  | 'dependency'
+  | 'data'
+
+export type ChaosSeverityLevel = 'mild' | 'moderate' | 'severe'
+export type ChaosTargetKind   = 'node' | 'edge' | 'group'
 
 export enum SimulationStatus {
   Idle    = "idle",
@@ -560,22 +631,49 @@ export interface SimulationFrame {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ChaosScenarioDef {
-  id: ChaosScenarioId;
-  name: string;
-  tag: string;
-  description: string;
+  id:               ChaosScenarioId;
+  name:             string;
+  /** Short ALL_CAPS tag shown in the pill on the canvas node. */
+  tag:              string;
+  /** One-liner shown on hover in the sidebar. */
+  description:      string;
+  category:         ChaosCategory;
+  targetKind:       ChaosTargetKind;
+  /** Node types this scenario can be applied to. Empty = any or edge/group targeted. */
   validTargetTypes: NodeType[];
-  requiresTarget: boolean;
-  requiresConfig: boolean;
+  requiresTarget:   boolean;
+  /** Config inputs needed before firing. */
+  configSchema:     ChaosConfigSchema;
+  /** rps multiplier applied to target node (1 = no change). */
+  rpsMult:          number | 'varies';
+  /** Fixed ms added to latency. */
+  latencyAdd:       number | 'varies';
+  /** Failure rate override 0–1. -1 = no override. */
+  failureRate:      number;
+  /** Utilisation floor 0–1. -1 = no floor. */
+  utilFloor:        number;
 }
 
+export type ChaosConfigSchema =
+  | { type: 'none' }
+  | { type: 'severity' }
+  | { type: 'percentage';  label: string }
+  | { type: 'milliseconds'; label: string }
+  | { type: 'multiplier';  label: string; options: number[] }
+  | { type: 'group' }
+
 export interface ActiveScenario {
-  id: string;
-  scenarioId: ChaosScenarioId;
+  id:            string;
+  scenarioId:    ChaosScenarioId;
   targetNodeIds: string[];
-  config: Record<string, unknown>;
-  activatedAt: number;
-  resolvesAt?: number;
+  targetEdgeIds: string[];
+  config:        Record<string, unknown>;
+  activatedAt:   number;
+  resolvesAt?:   number;
+  /** Resolved impact stat shown in the canvas pill e.g. "23% DROPPED" */
+  impactLabel:   string;
+  /** red = crash/failure, orange = degraded/moderate */
+  severity:      'red' | 'orange';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
