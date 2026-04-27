@@ -4,11 +4,12 @@ import { runInAction } from 'mobx'
 import {
   AreaChart, Area, ResponsiveContainer, Tooltip,
 } from 'recharts'
-import { ChevronUp, ChevronDown, AlertTriangle, DollarSign, TrendingUp, Info } from 'lucide-react'
+import { ChevronUp, ChevronDown, AlertTriangle, DollarSign, TrendingUp, Info, Zap } from 'lucide-react'
 import { simulationStore } from '../../stores/SimulationStore'
 import { costStore } from '../../stores/CostStore'
 import { graphStore } from '../../stores/GraphStore'
 import { validationStore } from '../../stores/ValidationStore'
+import { chaosStore, SCENARIO_CATALOGUE } from '../../stores/ChaosStore'
 import { SimulationStatus } from '../../types/topology'
 import type { ValidationIssue } from '../../validation/types'
 
@@ -82,6 +83,7 @@ const MetricsPanel = observer(() => {
   const [metricsOpen, setMetricsOpen] = useState(true)
   const [costOpen, setCostOpen] = useState(true)
   const [advisoriesOpen, setAdvisoriesOpen] = useState(true)
+  const [chaosLogOpen, setChaosLogOpen] = useState(true)
   const { status, globalMetrics, metricsHistory, bottleneckNodes } = simulationStore
 
   if (status === SimulationStatus.Idle) return null
@@ -320,6 +322,83 @@ const MetricsPanel = observer(() => {
           </div>
         )}
       </div>
+
+      {/* ── Cascade banner ─────────────────────────────────────────────────── */}
+      {chaosStore.isChaosModeActive && (() => {
+        const cs = chaosStore.cascadeSummary
+        return (
+          <>
+            <div className="h-px bg-app-border" />
+            <div className="px-4 py-2.5 bg-purple-500/10 border-t border-purple-500/20 flex items-center gap-2">
+              <Zap size={12} className="text-purple-400 shrink-0" />
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-purple-200 truncate">
+                    {cs ? cs.name : 'Chaos active'}
+                  </span>
+                  {cs && (
+                    <span className="text-[10px] font-bold tabular-nums text-purple-300 shrink-0">
+                      {cs.blastRadius}% blast radius
+                    </span>
+                  )}
+                </div>
+                {cs && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-purple-300/70">{cs.mechanism}</span>
+                    <span className="text-[10px] text-purple-400/50">·</span>
+                    <span className="text-[10px] text-purple-300/70">{cs.impactedCount} node{cs.impactedCount !== 1 ? 's' : ''} affected</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
+      {/* ── Chaos event log ────────────────────────────────────────────────── */}
+      {chaosStore.scenarioLog.length > 0 && (
+        <>
+          <div className="h-px bg-app-border" />
+          <button
+            onClick={() => setChaosLogOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-app-elevated/50 transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <Zap size={11} className="text-purple-400" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-purple-400/80">
+                Chaos Log
+              </span>
+              <span className="text-[10px] text-purple-400/60 font-medium">
+                ({chaosStore.scenarioLog.length})
+              </span>
+            </div>
+            {chaosLogOpen
+              ? <ChevronDown size={13} className="text-app-text-3" />
+              : <ChevronUp size={13} className="text-app-text-3" />
+            }
+          </button>
+          {chaosLogOpen && (
+            <div className="px-4 pb-3 flex flex-col gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
+              {[...chaosStore.scenarioLog].reverse().slice(0, 20).map((ev, i) => {
+                const def = SCENARIO_CATALOGUE.find(s => s.id === ev.scenarioId)
+                const ts  = new Date(ev.timestamp)
+                const timeStr = `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}:${ts.getSeconds().toString().padStart(2,'0')}`
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[9px] tabular-nums text-app-text-3 shrink-0">{timeStr}</span>
+                    <span className={['text-[9px] font-bold px-1 rounded shrink-0', ev.phase === 'activated' ? 'bg-purple-500/20 text-purple-300' : 'bg-app-elevated text-app-text-3'].join(' ')}>
+                      {ev.phase === 'activated' ? 'ON' : 'OFF'}
+                    </span>
+                    <span className="text-[10px] text-app-text-2 truncate">
+                      {def?.name ?? ev.scenarioId}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
 
       {/* ── Advisories strip ───────────────────────────────────────────────── */}
       {validationStore.report?.advisories && validationStore.report.advisories.length > 0 && (

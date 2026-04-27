@@ -25,8 +25,10 @@ import type { CustomNodeData } from './CustomNode'
 import type { StructuralRFData } from './StructuralNodeComponent'
 import { NodeType, StructuralNodeType, SimulationStatus } from '../../types/topology'
 import { simulationStore } from '../../stores/SimulationStore'
+import { chaosStore } from '../../stores/ChaosStore'
 import ChaosContextMenu from './ChaosContextMenu'
 import type { ContextMenuTarget } from './ChaosContextMenu'
+import ChaosToolbar from './ChaosToolbar'
 
 const SNAP_GRID: [number, number] = [20, 20]
 const SIM_TYPES    = new Set(Object.values(NodeType))
@@ -102,9 +104,12 @@ const CanvasPanel = observer(() => {
     zIndex:   -1,
   }))
 
+  const chaosEdgeIds = chaosStore.affectedEdgeIds
+
   const rfEdges: Edge[] = Array.from(graphStore.edges.values()).map(e => {
-    const isSelected = e.id === graphStore.selectedEdgeId
-    const arrowColor = isSelected ? '#8b5cf6' : '#4a4a6a'
+    const isSelected  = e.id === graphStore.selectedEdgeId
+    const isChaosEdge = chaosEdgeIds.includes(e.id)
+    const arrowColor  = isChaosEdge ? '#a855f7' : isSelected ? '#8b5cf6' : '#4a4a6a'
     return {
       id:          e.id,
       source:      e.sourceId,
@@ -114,6 +119,7 @@ const CanvasPanel = observer(() => {
       selected:    isSelected,
       markerEnd:   { type: MarkerType.ArrowClosed, width: 16, height: 16, color: arrowColor },
       markerStart: e.bidirectional ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: arrowColor } : undefined,
+      style:       isChaosEdge ? { stroke: '#a855f7', strokeDasharray: '6 3', strokeWidth: 2 } : undefined,
     }
   })
 
@@ -309,6 +315,7 @@ const CanvasPanel = observer(() => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <CanvasToolbar />
+      <ChaosToolbar />
 
       {/* Connect-mode hint */}
       {mode === 'connect' && (

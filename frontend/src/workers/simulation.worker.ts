@@ -15,9 +15,9 @@ import type {
   TopologySchema, SimNode, SimEdge,
   WorkerInboundMessage, WorkerOutboundMessage,
   SimulationFrame, NodeRuntimeState,
-  ClientConfig,
+  ClientConfig, ActiveScenario,
 } from '../types/topology'
-import { SolverState, computeNodeFlow, healthFrom } from './constraintSolver'
+import { SolverState, computeNodeFlow, healthFrom, buildChaosModifier } from './constraintSolver'
 import { aggregateMetrics } from './metricAggregator'
 import { emitEdgeFlows } from './particleEmitter'
 
@@ -34,7 +34,8 @@ let status:     SimulationStatus = SimulationStatus.Idle
 let intervalId: ReturnType<typeof setInterval> | null = null
 let tickId      = 0
 
-const solverState = new SolverState()
+const solverState   = new SolverState()
+const workerChaos   = new Map<string, ActiveScenario>()
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
       stopLoop()
       topology = null
       solverState.reset()
+      workerChaos.clear()
       break
 
     case 'SET_SPEED':
@@ -75,6 +77,14 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
 
     case 'UPDATE_TOPOLOGY':
       topology = msg.topology
+      break
+
+    case 'ACTIVATE_CHAOS':
+      workerChaos.set(msg.scenario.id, msg.scenario)
+      break
+
+    case 'DEACTIVATE_CHAOS':
+      workerChaos.delete(msg.instanceId)
       break
   }
 }
@@ -186,7 +196,8 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     const effectiveIncoming = node.nodeType === NodeType.Client ? 0 : incoming
 
     const outs = outEdges.get(node.id) ?? []
-    const flow = computeNodeFlow(node, effectiveIncoming, solverState, tick, tickSecs)
+    const chaosModifier = buildChaosModifier(node.id, workerChaos)
+    const flow = computeNodeFlow(node, effectiveIncoming, solverState, tick, tickSecs, chaosModifier)
 
     // Distribute outflow evenly across outgoing edges
     const perEdge = outs.length > 0 ? flow.outRps / outs.length : 0

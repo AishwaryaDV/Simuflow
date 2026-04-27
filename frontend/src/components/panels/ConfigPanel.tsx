@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { useState, useEffect } from 'react'
-import { Trash2, DollarSign, Info } from 'lucide-react'
+import { Trash2, DollarSign, Info, Zap, X } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
 import { validationStore } from '../../stores/ValidationStore'
 import {
@@ -16,6 +16,7 @@ import type {
 } from '../../types/topology'
 import { NODE_DISPLAY, STRUCTURAL_DISPLAY } from '../canvas/nodeConfig'
 import { costStore } from '../../stores/CostStore'
+import { chaosStore } from '../../stores/ChaosStore'
 
 // ── Shared field primitives ───────────────────────────────────────────────────
 
@@ -611,6 +612,47 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
   )
 }
 
+// ── Active chaos on selected node ────────────────────────────────────────────
+
+const ActiveChaosSection = observer(({ nodeId }: { nodeId: string }) => {
+  const active = chaosStore.scenariosForNode(nodeId)
+  if (active.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Zap size={10} className="text-purple-400" />
+        <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400/80">
+          Active Chaos
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {active.map(s => (
+          <div
+            key={s.id}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30"
+          >
+            <div className={['w-1.5 h-1.5 rounded-full shrink-0', s.severity === 'red' ? 'bg-red-500' : 'bg-orange-400'].join(' ')} />
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-purple-200 truncate">{s.name}</p>
+              {s.impactLabel && (
+                <p className="text-[10px] text-purple-300/70">{s.impactLabel}</p>
+              )}
+            </div>
+            <button
+              onClick={() => chaosStore.deactivateScenario(s.id)}
+              className="shrink-0 text-purple-400/60 hover:text-red-400 p-0.5 rounded transition-colors"
+              title="Kill chaos scenario"
+            >
+              <X size={11} strokeWidth={2} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+})
+
 // ── Advisory hints for selected node ─────────────────────────────────────────
 
 const NodeAdvisories = observer(({ nodeId }: { nodeId: string }) => {
@@ -754,6 +796,7 @@ const ConfigPanel = observer(() => {
               className={inputCls} />
           </Field>
         </FieldGroup>
+        <ActiveChaosSection nodeId={nodeId!} />
         {renderConfigFields()}
         <CostPlaceholder nodeType={node.nodeType} />
         <NodeAdvisories nodeId={nodeId!} />

@@ -38,10 +38,12 @@ export function useWorkerBridge() {
         const topo = JSON.parse(JSON.stringify(graphStore.topology))
         worker.postMessage({ type: 'START', topology: topo, speed: simulationStore.speed })
       },
-      pause:     () => worker.postMessage({ type: 'PAUSE' }),
-      resume:    () => worker.postMessage({ type: 'RESUME' }),
-      stop:      () => worker.postMessage({ type: 'STOP' }),
-      setSpeed:  (s: number) => worker.postMessage({ type: 'SET_SPEED', speed: s }),
+      pause:          () => worker.postMessage({ type: 'PAUSE' }),
+      resume:         () => worker.postMessage({ type: 'RESUME' }),
+      stop:           () => worker.postMessage({ type: 'STOP' }),
+      setSpeed:       (s: number) => worker.postMessage({ type: 'SET_SPEED', speed: s }),
+      activateChaos:  (scenario) => worker.postMessage({ type: 'ACTIVATE_CHAOS', scenario }),
+      deactivateChaos:(instanceId) => worker.postMessage({ type: 'DEACTIVATE_CHAOS', instanceId }),
     }
 
     return () => {

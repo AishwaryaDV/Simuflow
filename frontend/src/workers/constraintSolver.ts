@@ -9,7 +9,7 @@
 
 import { NodeType, NodeHealth } from '../types/topology'
 import type {
-  SimNode,
+  SimNode, ActiveScenario,
   BaseNodeConfig, ClientConfig, LoadBalancerConfig, CacheConfig, CDNConfig,
   QueueConfig, ApiGatewayConfig, ServerlessConfig, WorkerConfig as WorkerNodeConfig,
   PubSubConfig, StreamConfig, RateLimiterConfig, ObjectStoreConfig,
@@ -17,6 +17,125 @@ import type {
   DNSConfig, NoSQLStoreConfig, WAFConfig, GraphDBConfig,
   ObservabilityMeshConfig, ToolRegistryConfig, MemoryFabricConfig,
 } from '../types/topology'
+
+// ── Chaos modifier ────────────────────────────────────────────────────────────
+
+export interface ChaosModifier {
+  rpsMult:     number   // applied to incomingRps (1 = no change)
+  failureRate: number   // -1 = use node's own; 0–1 overrides
+  utilFloor:   number   // -1 = no floor; 0–1 = minimum utilisation
+}
+
+const NO_CHAOS: ChaosModifier = { rpsMult: 1, failureRate: -1, utilFloor: -1 }
+
+// Severity → multiplier / floor tables
+const SEV_RPS:   Record<string, number> = { mild: 0.7, moderate: 0.4, severe: 0.1 }
+const SEV_FLOOR: Record<string, number> = { mild: -1,  moderate: 0.7, severe: 1.0 }
+
+/** Aggregate all active chaos scenarios targeting this node into a single modifier. */
+export function buildChaosModifier(
+  nodeId:      string,
+  workerChaos: Map<string, ActiveScenario>,
+): ChaosModifier {
+  let rpsMult     = 1
+  let failureRate = -1
+  let utilFloor   = -1
+
+  for (const scenario of workerChaos.values()) {
+    if (!scenario.targetNodeIds.includes(nodeId)) continue
+
+    const id  = scenario.scenarioId
+    const cfg = scenario.config as Record<string, unknown>
+    const sev = (cfg.severity as string) ?? 'moderate'
+    const mul = (cfg.multiplier as number) ?? 2
+    const cap = (cfg.cap      as number) ?? 50
+
+    // Crash / failure scenarios — immediate kill
+    if ([
+      'INFRA_INSTANCE_CRASH', 'INFRA_DISK_FAILURE', 'APP_OOM_CRASH', 'APP_DEADLOCK',
+      'NET_LB_FAILURE', 'NET_TLS_CERT', 'NET_DNS_FAILURE', 'NET_NAT_FAILURE',
+      'NET_BLACKHOLE', 'DEP_THIRD_PARTY', 'DEP_AUTH_OUTAGE', 'DEP_SERVICE_DISCOVERY',
+      'DATA_DB_PRIMARY_CRASH', 'DATA_CACHE_SENTINEL_SPLIT',
+    ].includes(id)) {
+      rpsMult     = 0
+      failureRate = 1.0
+      continue
+    }
+
+    // Degradation / severity-based
+    if (['INFRA_INSTANCE_DEGRADATION', 'INFRA_CPU_THROTTLE', 'APP_MEMORY_LEAK'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, SEV_RPS[sev] ?? 0.4)
+      utilFloor   = Math.max(utilFloor, SEV_FLOOR[sev] ?? -1)
+      continue
+    }
+
+    // IOPS / bandwidth throttle — cap as % of normal
+    if (['INFRA_IOPS_THROTTLE', 'NET_BANDWIDTH'].includes(id)) {
+      rpsMult = Math.min(rpsMult, cap / 100)
+      continue
+    }
+
+    // Corruption — partial failures
+    if (['INFRA_DISK_CORRUPTION', 'DATA_CORRUPTION', 'DATA_CACHE_POISONING'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, 0.5)
+      failureRate = Math.max(failureRate, 0.4)
+      continue
+    }
+
+    // Thread / pool exhaustion
+    if (['APP_THREAD_EXHAUSTION', 'DATA_CONN_POOL'].includes(id)) {
+      rpsMult     = 0
+      failureRate = Math.max(failureRate, 0.9)
+      utilFloor   = 1.0
+      continue
+    }
+
+    // Traffic amplification
+    if (['TRAFFIC_SPIKE', 'TRAFFIC_RETRY_STORM', 'TRAFFIC_BOT_FLOOD', 'TRAFFIC_THUNDERING_HERD'].includes(id)) {
+      rpsMult = Math.max(rpsMult, mul)
+      if (id === 'TRAFFIC_BOT_FLOOD') failureRate = Math.max(failureRate, 0.6)
+      continue
+    }
+
+    // Queue backlog / replication lag
+    if (['DEP_QUEUE_BACKLOG', 'DATA_CACHE_EVICTION_STORM'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, 0.1)
+      utilFloor   = 1.0
+      continue
+    }
+
+    // Data layer — moderate degradation
+    if (['DATA_REPLICA_FAILURE', 'DATA_REPLICATION_LAG', 'DATA_CACHE_OOM'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, 0.4)
+      failureRate = Math.max(failureRate, 0.2)
+      continue
+    }
+
+    if (['DATA_SPLIT_BRAIN', 'DATA_CACHE_REPLICA_DESYNC', 'DATA_CACHE_CLUSTER_PARTITION'].includes(id)) {
+      failureRate = Math.max(failureRate, 0.3)
+      continue
+    }
+
+    if (['DATA_LOCK_CONTENTION', 'DATA_HOT_PARTITION', 'DATA_NOISY_NEIGHBOUR'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, 0.3)
+      utilFloor   = Math.max(utilFloor, 0.9)
+      continue
+    }
+
+    if (['APP_DEP_TIMEOUT'].includes(id)) {
+      rpsMult     = Math.min(rpsMult, 0.5)
+      failureRate = Math.max(failureRate, 0.3)
+      continue
+    }
+
+    if (['NET_STICKY_SKEW', 'APP_LOG_OVERLOAD'].includes(id)) {
+      utilFloor = 1.0
+      continue
+    }
+  }
+
+  return { rpsMult, failureRate, utilFloor }
+}
 
 // ── Output type ───────────────────────────────────────────────────────────────
 
@@ -64,78 +183,91 @@ export function computeNodeFlow(
   state:       SolverState,
   tickId:      number,
   tickSecs:    number,   // simulated seconds per tick (TICK_SECS * speed)
+  chaos:       ChaosModifier = NO_CHAOS,
 ): NodeFlow {
+  // Apply chaos RPS multiplier to incoming traffic
+  const effectiveRps = incomingRps * chaos.rpsMult
+
   const failureRoll = Math.random()
+
+  // Helper: apply chaos failure/util overrides to a computed flow
+  const applyChaos = (flow: NodeFlow): NodeFlow => {
+    const errorRate = chaos.failureRate >= 0 ? chaos.failureRate : flow.errorRate
+    const outRps    = chaos.failureRate >= 0 ? flow.outRps * (1 - chaos.failureRate) : flow.outRps
+    const util      = chaos.utilFloor   >= 0 ? Math.max(flow.utilisationPct, chaos.utilFloor * 100) : flow.utilisationPct
+    return { ...flow, outRps, errorRate, utilisationPct: util }
+  }
 
   switch (node.nodeType) {
 
     case NodeType.Client: {
       const cfg   = node.config as ClientConfig
       const burst = cfg.burst && (tickId % 30 < 5) ? 3 : 1
-      return { outRps: cfg.rps * burst, utilisationPct: 0, errorRate: 0, queueDepth: 0 }
+      // Chaos rpsMult amplifies client output (traffic spike / bot flood)
+      return { outRps: cfg.rps * burst * chaos.rpsMult, utilisationPct: 0, errorRate: 0, queueDepth: 0 }
     }
 
     case NodeType.LoadBalancer: {
       const cfg    = node.config as LoadBalancerConfig
-      const util   = incomingRps / cfg.capacity
+      const util   = effectiveRps / cfg.capacity
       const failed = failureRoll < cfg.failureRate
-      return { outRps: failed ? 0 : incomingRps, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 }
+      return applyChaos({ outRps: failed ? 0 : effectiveRps, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 })
     }
 
     case NodeType.ApiGateway: {
       const cfg     = node.config as ApiGatewayConfig
-      const limited = cfg.rateLimit > 0 ? Math.min(incomingRps, cfg.rateLimit) : incomingRps
-      const util    = incomingRps / cfg.capacity
+      const limited = cfg.rateLimit > 0 ? Math.min(effectiveRps, cfg.rateLimit) : effectiveRps
+      const util    = effectiveRps / cfg.capacity
       const failed  = failureRoll < cfg.failureRate
-      const errRate = (incomingRps - limited) / Math.max(incomingRps, 1)
-      return { outRps: failed ? 0 : limited, utilisationPct: util * 100, errorRate: failed ? 1 : errRate, queueDepth: 0 }
+      const errRate = (effectiveRps - limited) / Math.max(effectiveRps, 1)
+      return applyChaos({ outRps: failed ? 0 : limited, utilisationPct: util * 100, errorRate: failed ? 1 : errRate, queueDepth: 0 })
     }
 
     case NodeType.ApiServer:
     case NodeType.Microservice: {
       const cfg   = node.config as BaseNodeConfig
-      const util  = incomingRps / cfg.capacity
+      const util  = effectiveRps / cfg.capacity
       const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.capacity),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.capacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.Cache: {
       const cfg  = node.config as CacheConfig
-      return { outRps: incomingRps * (1 - cfg.hitRate), utilisationPct: (incomingRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 }
+      return applyChaos({ outRps: effectiveRps * (1 - cfg.hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
     }
 
     case NodeType.CDN: {
       const cfg  = node.config as CDNConfig
-      return { outRps: incomingRps * (1 - cfg.hitRate), utilisationPct: (incomingRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 }
+      return applyChaos({ outRps: effectiveRps * (1 - cfg.hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
     }
 
     case NodeType.Database: {
       const cfg    = node.config as BaseNodeConfig
-      const util   = incomingRps / cfg.capacity
+      const util   = effectiveRps / cfg.capacity
       const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.capacity),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.capacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.Queue: {
       const cfg    = node.config as QueueConfig
       const prev   = state.queueDepths.get(node.id) ?? 0
-      const added  = incomingRps * tickSecs
+      const added  = effectiveRps * tickSecs
       const drained = (1 / (cfg.delayMs / 1000 || 0.1)) * tickSecs
       const depth  = Math.max(0, prev + added - drained)
       const capped = cfg.maxDepth > 0 ? Math.min(depth, cfg.maxDepth) : depth
       state.queueDepths.set(node.id, capped)
       const util = cfg.maxDepth > 0 ? capped / cfg.maxDepth : Math.min(capped / 1000, 1)
-      return { outRps: drained / tickSecs, utilisationPct: util * 100, errorRate: 0, queueDepth: Math.round(capped) }
+      return applyChaos({ outRps: drained / tickSecs, utilisationPct: util * 100, errorRate: 0, queueDepth: Math.round(capped) })
     }
 
     case NodeType.Serverless: {
@@ -143,254 +275,241 @@ export function computeNodeFlow(
       const cold       = Math.random() < cfg.coldStartProbability
       const effMs      = cold ? cfg.coldStartMs : cfg.warmLatencyMs
       const throughput = (cfg.concurrencyLimit * 1000) / Math.max(effMs, 1)
-      const util       = incomingRps / throughput
+      const util       = effectiveRps / throughput
       const failed     = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, throughput),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, throughput),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.Worker: {
       const cfg    = node.config as WorkerNodeConfig
       const prev   = state.queueDepths.get(node.id) ?? 0
-      const added  = incomingRps * tickSecs
+      const added  = effectiveRps * tickSecs
       const drained = cfg.throughput * tickSecs
       const depth  = Math.max(0, prev + added - drained)
       state.queueDepths.set(node.id, depth)
-      const util   = incomingRps / cfg.throughput
+      const util   = effectiveRps / cfg.throughput
       const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.throughput),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.throughput),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : 0,
         queueDepth:     Math.round(depth),
-      }
+      })
     }
 
     case NodeType.PubSub: {
       const cfg    = node.config as PubSubConfig
       const prev   = state.queueDepths.get(node.id) ?? 0
-      const added  = incomingRps * tickSecs
+      const added  = effectiveRps * tickSecs
       const drain  = (1 / (cfg.deliveryLatencyMs / 1000 || 0.01)) * tickSecs
       const depth  = Math.max(0, prev + added - drain)
       const capped = cfg.maxDepth > 0 ? Math.min(depth, cfg.maxDepth) : depth
       state.queueDepths.set(node.id, capped)
       const util   = cfg.maxDepth > 0 ? capped / cfg.maxDepth : Math.min(capped / 1000, 1)
-      return {
+      return applyChaos({
         outRps:         (drain / tickSecs) * cfg.subscriberCount,
         utilisationPct: util * 100,
         errorRate:      failureRoll < cfg.failureRate ? 1 : 0,
         queueDepth:     Math.round(capped),
-      }
+      })
     }
 
     case NodeType.Stream: {
       const cfg    = node.config as StreamConfig
-      const util   = incomingRps / cfg.throughput
+      const util   = effectiveRps / cfg.throughput
       const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.throughput) * cfg.consumerGroups,
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.throughput) * cfg.consumerGroups,
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : 0,
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.RateLimiter: {
       const cfg     = node.config as RateLimiterConfig
-      const allowed = Math.min(incomingRps, cfg.rateLimit + cfg.burstSize / tickSecs)
-      const util    = incomingRps / cfg.rateLimit
-      const errRate = (incomingRps - allowed) / Math.max(incomingRps, 1)
-      return { outRps: allowed, utilisationPct: util * 100, errorRate: errRate, queueDepth: 0 }
+      const allowed = Math.min(effectiveRps, cfg.rateLimit + cfg.burstSize / tickSecs)
+      const util    = effectiveRps / cfg.rateLimit
+      const errRate = (effectiveRps - allowed) / Math.max(effectiveRps, 1)
+      return applyChaos({ outRps: allowed, utilisationPct: util * 100, errorRate: errRate, queueDepth: 0 })
     }
 
     case NodeType.ObjectStore: {
       const cfg    = node.config as ObjectStoreConfig
-      const util   = incomingRps / cfg.readThroughputMbps
+      const util   = effectiveRps / cfg.readThroughputMbps
       const failed = failureRoll < cfg.failureRate
-      return { outRps: failed ? 0 : incomingRps, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 }
+      return applyChaos({ outRps: failed ? 0 : effectiveRps, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 })
     }
 
     case NodeType.ExternalService: {
       const cfg    = node.config as ExternalServiceConfig
-      const util   = incomingRps / (cfg.rateLimit || 1000)
+      const util   = effectiveRps / (cfg.rateLimit || 1000)
       const failed = failureRoll < cfg.failureRate
-      const out    = failed ? 0 : (cfg.rateLimit > 0 ? Math.min(incomingRps, cfg.rateLimit) : incomingRps)
-      return { outRps: out, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 }
+      const out    = failed ? 0 : (cfg.rateLimit > 0 ? Math.min(effectiveRps, cfg.rateLimit) : effectiveRps)
+      return applyChaos({ outRps: out, utilisationPct: util * 100, errorRate: failed ? 1 : 0, queueDepth: 0 })
     }
 
     case NodeType.LLMGateway: {
       const cfg          = node.config as LLMGatewayConfig
       const tokensPerReq = cfg.avgPromptTokens + cfg.avgCompletionTokens
-      const tpmUsed      = incomingRps * tokensPerReq * 60
+      const tpmUsed      = effectiveRps * tokensPerReq * 60
       const util         = tpmUsed / cfg.rateLimitTpm
       const failed       = failureRoll < cfg.failureRate
       const maxRps       = cfg.rateLimitTpm / (tokensPerReq * 60)
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, maxRps),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, maxRps),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.VectorDB: {
       const cfg    = node.config as VectorDBConfig
-      const util   = incomingRps / cfg.queryCapacity
+      const util   = effectiveRps / cfg.queryCapacity
       const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.queryCapacity),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.queryCapacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.AgentOrchestrator: {
       const cfg        = node.config as AgentOrchestratorConfig
       const timePerRun = cfg.maxSteps * cfg.stepLatencyMs
       const throughput = (cfg.maxConcurrentAgents * 1000) / Math.max(timePerRun, 1)
-      const util       = incomingRps / throughput
+      const util       = effectiveRps / throughput
       const failed     = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, throughput),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, throughput),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.DNS: {
       const cfg = node.config as DNSConfig
-      // TTL caching: higher TTL means more queries served from client cache,
-      // reducing effective load on the resolver. cachePct grows with TTL.
-      const cachePct   = Math.min(0.99, 1 - 60 / Math.max(cfg.ttlSeconds, 1))
-      const resolvedRps = incomingRps * (1 - cachePct)
-      // latency benefit from more regions (each doubling regions cuts latency ~20%)
+      const cachePct    = Math.min(0.99, 1 - 60 / Math.max(cfg.ttlSeconds, 1))
+      const resolvedRps = effectiveRps * (1 - cachePct)
       const regionFactor = 1 / Math.sqrt(Math.max(cfg.regions, 1))
-      const capacity   = 50_000 * cfg.regions   // DNS resolvers scale horizontally
-      const util       = resolvedRps / capacity
-      const failed     = failureRoll < cfg.failureRate
-      void regionFactor   // used for latency context in metricAggregator
-      return {
-        outRps:         failed ? 0 : incomingRps,  // DNS passes all traffic through
+      const capacity    = 50_000 * cfg.regions
+      const util        = resolvedRps / capacity
+      const failed      = failureRoll < cfg.failureRate
+      void regionFactor
+      return applyChaos({
+        outRps:         failed ? 0 : effectiveRps,
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : 0,
         queueDepth:     0,
-      }
+      })
     }
 
     case NodeType.NoSQLStore: {
-      const cfg        = node.config as NoSQLStoreConfig
-      // Assume 80% reads, 20% writes (typical workload)
-      const readRps    = incomingRps * 0.8
-      const writeRps   = incomingRps * 0.2 * cfg.replicationFactor  // writes fan out
-      const readUtil   = readRps  / Math.max(cfg.readCapacity, 1)
-      const writeUtil  = writeRps / Math.max(cfg.writeCapacity, 1)
-      const util       = Math.max(readUtil, writeUtil)               // bottleneck dimension
-      const failed     = failureRoll < cfg.failureRate
-      const totalCapacity = cfg.readCapacity + cfg.writeCapacity / cfg.replicationFactor
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, totalCapacity),
-        utilisationPct: util * 100,
-        errorRate:      failed ? 1 : Math.max(0, util - 1),
-        queueDepth:     0,
-      }
-    }
-
-    case NodeType.WAF: {
-      const cfg     = node.config as WAFConfig
-      // WAF blocks a fraction of traffic and adds inspection latency.
-      // Utilisation is against inspection capacity — exceeding it means WAF becomes the bottleneck.
-      const allowed = incomingRps * (1 - cfg.blockRate)
-      const util    = incomingRps / Math.max(cfg.inspectionCapacity, 1)
-      const failed  = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? incomingRps : allowed,  // fail-open: WAF failure passes all traffic
-        utilisationPct: util * 100,
-        errorRate:      cfg.blockRate,                   // blocked traffic = error from client perspective
-        queueDepth:     0,
-      }
-    }
-
-    case NodeType.ObservabilityMesh: {
-      const cfg  = node.config as ObservabilityMeshConfig
-      // Fail-open: if the mesh goes down, traffic passes through unobserved.
-      // Utilisation is against inspection capacity — high-traffic services
-      // can overwhelm the mesh and cause sampling degradation.
-      const util   = incomingRps / Math.max(cfg.inspectionRps, 1)
-      const failed = failureRoll < cfg.failureRate
-      return {
-        outRps:         incomingRps,   // mesh never drops traffic
-        utilisationPct: util * 100,
-        errorRate:      failed ? 0.001 : 0,   // silent loss of observability, not request failure
-        queueDepth:     0,
-      }
-    }
-
-    case NodeType.ToolRegistry: {
-      const cfg  = node.config as ToolRegistryConfig
-      // Lookup latency scales logarithmically with tool count.
-      // High tool count = slower discovery = lower effective throughput.
-      const lookupOverhead = Math.log2(Math.max(cfg.toolCount, 2)) / 10
-      const effectiveCap   = cfg.capacity / (1 + lookupOverhead)
-      const util           = incomingRps / Math.max(effectiveCap, 1)
-      const failed         = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, effectiveCap),
-        utilisationPct: util * 100,
-        errorRate:      failed ? 1 : Math.max(0, util - 1),
-        queueDepth:     0,
-      }
-    }
-
-    case NodeType.MemoryFabric: {
-      const cfg       = node.config as MemoryFabricConfig
-      // Agent workloads are write-heavy per step (60% writes, 40% reads).
-      const readRps   = incomingRps * 0.4
-      const writeRps  = incomingRps * 0.6
+      const cfg       = node.config as NoSQLStoreConfig
+      const readRps   = effectiveRps * 0.8
+      const writeRps  = effectiveRps * 0.2 * cfg.replicationFactor
       const readUtil  = readRps  / Math.max(cfg.readCapacity, 1)
       const writeUtil = writeRps / Math.max(cfg.writeCapacity, 1)
       const util      = Math.max(readUtil, writeUtil)
       const failed    = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.readCapacity + cfg.writeCapacity),
+      const totalCap  = cfg.readCapacity + cfg.writeCapacity / cfg.replicationFactor
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, totalCap),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
+    }
+
+    case NodeType.WAF: {
+      const cfg     = node.config as WAFConfig
+      const allowed = effectiveRps * (1 - cfg.blockRate)
+      const util    = effectiveRps / Math.max(cfg.inspectionCapacity, 1)
+      const failed  = failureRoll < cfg.failureRate
+      return applyChaos({
+        outRps:         failed ? effectiveRps : allowed,
+        utilisationPct: util * 100,
+        errorRate:      cfg.blockRate,
+        queueDepth:     0,
+      })
+    }
+
+    case NodeType.ObservabilityMesh: {
+      const cfg  = node.config as ObservabilityMeshConfig
+      const util   = effectiveRps / Math.max(cfg.inspectionRps, 1)
+      const failed = failureRoll < cfg.failureRate
+      return applyChaos({
+        outRps:         effectiveRps,
+        utilisationPct: util * 100,
+        errorRate:      failed ? 0.001 : 0,
+        queueDepth:     0,
+      })
+    }
+
+    case NodeType.ToolRegistry: {
+      const cfg  = node.config as ToolRegistryConfig
+      const lookupOverhead = Math.log2(Math.max(cfg.toolCount, 2)) / 10
+      const effectiveCap   = cfg.capacity / (1 + lookupOverhead)
+      const util           = effectiveRps / Math.max(effectiveCap, 1)
+      const failed         = failureRoll < cfg.failureRate
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, effectiveCap),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
+        queueDepth:     0,
+      })
+    }
+
+    case NodeType.MemoryFabric: {
+      const cfg      = node.config as MemoryFabricConfig
+      const readRps  = effectiveRps * 0.4
+      const writeRps = effectiveRps * 0.6
+      const readUtil  = readRps  / Math.max(cfg.readCapacity, 1)
+      const writeUtil = writeRps / Math.max(cfg.writeCapacity, 1)
+      const util      = Math.max(readUtil, writeUtil)
+      const failed    = failureRoll < cfg.failureRate
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.readCapacity + cfg.writeCapacity),
+        utilisationPct: util * 100,
+        errorRate:      failed ? 1 : Math.max(0, util - 1),
+        queueDepth:     0,
+      })
     }
 
     case NodeType.GraphDB: {
-      const cfg    = node.config as GraphDBConfig
-      // Graph queries are read-heavy; assume 70% reads / 30% writes
-      const readRps  = incomingRps * 0.7
-      const writeRps = incomingRps * 0.3
+      const cfg      = node.config as GraphDBConfig
+      const readRps  = effectiveRps * 0.7
+      const writeRps = effectiveRps * 0.3
       const readUtil  = readRps  / Math.max(cfg.queryCapacity, 1)
       const writeUtil = writeRps / Math.max(cfg.writeCapacity, 1)
       const util      = Math.max(readUtil, writeUtil)
       const failed    = failureRoll < cfg.failureRate
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.queryCapacity + cfg.writeCapacity),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.queryCapacity + cfg.writeCapacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : Math.max(0, util - 1),
         queueDepth:     0,
-      }
+      })
     }
 
     default: {
       const cfg    = (node as SimNode).config as BaseNodeConfig
-      const util   = incomingRps / cfg.capacity
+      const util   = effectiveRps / cfg.capacity
       const failed = failureRoll < (cfg.failureRate ?? 0)
-      return {
-        outRps:         failed ? 0 : Math.min(incomingRps, cfg.capacity),
+      return applyChaos({
+        outRps:         failed ? 0 : Math.min(effectiveRps, cfg.capacity),
         utilisationPct: util * 100,
         errorRate:      failed ? 1 : 0,
         queueDepth:     0,
-      }
+      })
     }
   }
 }

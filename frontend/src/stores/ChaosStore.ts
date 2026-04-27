@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import type { ActiveScenario, ChaosEvent, ChaosScenarioDef } from '../types/topology'
 import { ChaosScenarioId, NodeType } from '../types/topology'
 import { graphStore } from './GraphStore'
+import { simulationStore } from './SimulationStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scenario catalogue — 53 scenarios across 6 categories
@@ -597,6 +598,7 @@ class ChaosStore {
     }
     this.activeScenarios.set(instance.id, instance)
     this._log(scenarioId, 'activated', [...targetNodeIds, ...targetEdgeIds])
+    simulationStore._bridge?.activateChaos(instance)
     return instance.id
   }
 
@@ -605,6 +607,7 @@ class ChaosStore {
     if (!s) return
     this.activeScenarios.delete(instanceId)
     this._log(s.scenarioId, 'resolved', [...s.targetNodeIds, ...s.targetEdgeIds])
+    simulationStore._bridge?.deactivateChaos(instanceId)
   }
 
   deactivateAllOnNode(nodeId: string) {

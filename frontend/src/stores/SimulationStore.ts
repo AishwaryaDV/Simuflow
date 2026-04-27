@@ -32,11 +32,13 @@ class SimulationStore {
 
   /** Set by useWorkerBridge — null until the worker is mounted. */
   _bridge: {
-    start:    () => void
-    pause:    () => void
-    resume:   () => void
-    stop:     () => void
-    setSpeed: (s: number) => void
+    start:          () => void
+    pause:          () => void
+    resume:         () => void
+    stop:           () => void
+    setSpeed:       (s: number) => void
+    activateChaos:  (scenario: import('../types/topology').ActiveScenario) => void
+    deactivateChaos:(instanceId: string) => void
   } | null = null
 
   constructor() {

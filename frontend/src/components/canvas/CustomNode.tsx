@@ -4,6 +4,7 @@ import { NodeHealth, NodeType, SimulationStatus } from '../../types/topology'
 import type { SimNode } from '../../types/topology'
 import { simulationStore } from '../../stores/SimulationStore'
 import { validationStore } from '../../stores/ValidationStore'
+import { chaosStore } from '../../stores/ChaosStore'
 import { NODE_DISPLAY } from './nodeConfig'
 
 /** Nodes that generate traffic — utilisation % is meaningless for these */
@@ -27,11 +28,17 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
   const display = NODE_DISPLAY[simNode.nodeType]
   const runtime = simulationStore.nodeStates.get(simNode.id)
   const health = runtime?.health ?? NodeHealth.Idle
-  const isRunning = simulationStore.status === SimulationStatus.Running
+  const isRunning = simulationStore.status === SimulationStatus.Running ||
+                    simulationStore.status === SimulationStatus.Chaos
 
-  // Ring priority: when idle show validation rings; when running show health rings
+  const activeChaos = chaosStore.scenariosForNode(simNode.id)
+  const hasChaos    = activeChaos.length > 0
+
+  // Ring priority (highest→lowest): chaos > health > validation
   let ringClass: string
-  if (isRunning) {
+  if (hasChaos) {
+    ringClass = 'ring-purple-500'
+  } else if (isRunning) {
     ringClass = HEALTH_RING[health]
   } else {
     const severity = validationStore.nodeValidationSeverity(simNode.id)
@@ -41,7 +48,7 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
   }
 
   // Small yellow dot badge: running simulation, node has a validation warning
-  const showWarnDot = isRunning &&
+  const showWarnDot = isRunning && !hasChaos &&
     validationStore.nodeValidationSeverity(simNode.id) === 'warning'
 
   const Icon = display.icon
@@ -80,6 +87,25 @@ const CustomNode = observer(({ data, selected }: NodeProps<CustomNodeType>) => {
           <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-yellow-400 border-2 border-app-bg" />
         )}
       </div>
+
+      {/* Chaos pills — stacked below node box, one per active scenario */}
+      {hasChaos && (
+        <div className="flex flex-col items-center gap-0.5 mt-0.5">
+          {activeChaos.map(s => (
+            <span
+              key={s.id}
+              className={[
+                'text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none',
+                s.severity === 'red'
+                  ? 'bg-red-600/90 text-white'
+                  : 'bg-orange-500/90 text-white',
+              ].join(' ')}
+            >
+              {s.tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Label below */}
       <span className="text-[11px] font-semibold text-white/90 truncate max-w-[100px] text-center leading-tight">
