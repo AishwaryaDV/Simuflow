@@ -5,11 +5,14 @@ from app.core.config import settings
 from app.api.v1.health import router as health_router
 from app.api.v1.diagrams import router as diagrams_router
 from app.api.v1.share import router as share_router
+from app.api.v1.presets import router as presets_router
+from app.services import preset_service
+from app.db.client import get_supabase_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: warm preset cache (added in Phase 4)
+    preset_service.load_presets(get_supabase_client())
     yield
     # Shutdown: cleanup if needed
 
@@ -33,3 +36,4 @@ app.add_middleware(
 app.include_router(health_router, tags=["health"])
 app.include_router(diagrams_router)
 app.include_router(share_router)
+app.include_router(presets_router)
