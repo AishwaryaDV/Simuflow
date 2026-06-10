@@ -46,7 +46,7 @@ export function aggregateMetrics(
     const cfg    = n.config as BaseNodeConfig
     const baseMs = (cfg as any).latencyMs ?? (cfg as any).warmLatencyMs ?? (cfg as any).queryLatencyMs ?? 10
     const loadFactor = 1 + Math.max(0, s.utilisationPct / 100)
-    return sum + baseMs * loadFactor
+    return sum + baseMs * loadFactor + (s.latencyAddMs ?? 0)
   }, 0)
 
   const avgUtil = nonClientStates.length

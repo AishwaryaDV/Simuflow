@@ -21,28 +21,35 @@ import type {
 // ── Chaos modifier ────────────────────────────────────────────────────────────
 
 export interface ChaosModifier {
-  rpsMult:     number   // applied to incomingRps (1 = no change)
-  failureRate: number   // -1 = use node's own; 0–1 overrides
-  utilFloor:   number   // -1 = no floor; 0–1 = minimum utilisation
+  rpsMult:      number   // applied to incomingRps (1 = no change)
+  failureRate:  number   // -1 = use node's own; 0–1 overrides
+  utilFloor:    number   // -1 = no floor; 0–1 = minimum utilisation
+  latencyAddMs: number   // extra ms added to node's base latency contribution
 }
 
-const NO_CHAOS: ChaosModifier = { rpsMult: 1, failureRate: -1, utilFloor: -1 }
+const NO_CHAOS: ChaosModifier = { rpsMult: 1, failureRate: -1, utilFloor: -1, latencyAddMs: 0 }
 
-// Severity → multiplier / floor tables
-const SEV_RPS:   Record<string, number> = { mild: 0.7, moderate: 0.4, severe: 0.1 }
-const SEV_FLOOR: Record<string, number> = { mild: -1,  moderate: 0.7, severe: 1.0 }
+// Severity → multiplier / floor / latency tables
+const SEV_RPS:     Record<string, number> = { mild: 0.7, moderate: 0.4, severe: 0.1 }
+const SEV_FLOOR:   Record<string, number> = { mild: -1,  moderate: 0.7, severe: 1.0 }
+const SEV_LATENCY: Record<string, number> = { mild: 20,  moderate: 50,  severe: 100 }
 
-/** Aggregate all active chaos scenarios targeting this node into a single modifier. */
+/** Aggregate all active chaos scenarios targeting this node (or its incoming edges) into a single modifier. */
 export function buildChaosModifier(
-  nodeId:      string,
-  workerChaos: Map<string, ActiveScenario>,
+  nodeId:          string,
+  incomingEdgeIds: string[],
+  workerChaos:     Map<string, ActiveScenario>,
 ): ChaosModifier {
-  let rpsMult     = 1
-  let failureRate = -1
-  let utilFloor   = -1
+  let rpsMult      = 1
+  let failureRate  = -1
+  let utilFloor    = -1
+  let latencyAddMs = 0
 
   for (const scenario of workerChaos.values()) {
-    if (!scenario.targetNodeIds.includes(nodeId)) continue
+    const targetsNode = scenario.targetNodeIds.includes(nodeId)
+    const targetsEdge = incomingEdgeIds.length > 0 &&
+      scenario.targetEdgeIds.some(eid => incomingEdgeIds.includes(eid))
+    if (!targetsNode && !targetsEdge) continue
 
     const id  = scenario.scenarioId
     const cfg = scenario.config as Record<string, unknown>
@@ -50,9 +57,25 @@ export function buildChaosModifier(
     const mul = (cfg.multiplier as number) ?? 2
     const cap = (cfg.cap      as number) ?? 50
 
+    // Edge-targeted latency scenarios — affect downstream node's latency
+    if (targetsEdge) {
+      if (id === 'NET_LATENCY') {
+        latencyAddMs += (cfg.value as number) ?? 100
+        continue
+      }
+      if (id === 'NET_BANDWIDTH') {
+        rpsMult       = Math.min(rpsMult, cap / 100)
+        latencyAddMs += 20
+        continue
+      }
+    }
+
+    if (!targetsNode) continue
+
     // Crash / failure scenarios — immediate kill
     if ([
-      'INFRA_INSTANCE_CRASH', 'INFRA_DISK_FAILURE', 'APP_OOM_CRASH', 'APP_DEADLOCK',
+      'INFRA_INSTANCE_CRASH', 'INFRA_DISK_FAILURE', 'INFRA_AZ_FAILURE', 'INFRA_DC_OUTAGE',
+      'APP_OOM_CRASH', 'APP_DEADLOCK',
       'NET_LB_FAILURE', 'NET_TLS_CERT', 'NET_DNS_FAILURE', 'NET_NAT_FAILURE',
       'NET_BLACKHOLE', 'DEP_THIRD_PARTY', 'DEP_AUTH_OUTAGE', 'DEP_SERVICE_DISCOVERY',
       'DATA_DB_PRIMARY_CRASH', 'DATA_CACHE_SENTINEL_SPLIT',
@@ -64,8 +87,9 @@ export function buildChaosModifier(
 
     // Degradation / severity-based
     if (['INFRA_INSTANCE_DEGRADATION', 'INFRA_CPU_THROTTLE', 'APP_MEMORY_LEAK'].includes(id)) {
-      rpsMult     = Math.min(rpsMult, SEV_RPS[sev] ?? 0.4)
-      utilFloor   = Math.max(utilFloor, SEV_FLOOR[sev] ?? -1)
+      rpsMult      = Math.min(rpsMult, SEV_RPS[sev] ?? 0.4)
+      utilFloor    = Math.max(utilFloor, SEV_FLOOR[sev] ?? -1)
+      latencyAddMs += SEV_LATENCY[sev] ?? 50
       continue
     }
 
@@ -75,10 +99,11 @@ export function buildChaosModifier(
       continue
     }
 
-    // Corruption — partial failures
+    // Corruption — partial failures with added latency
     if (['INFRA_DISK_CORRUPTION', 'DATA_CORRUPTION', 'DATA_CACHE_POISONING'].includes(id)) {
-      rpsMult     = Math.min(rpsMult, 0.5)
-      failureRate = Math.max(failureRate, 0.4)
+      rpsMult      = Math.min(rpsMult, 0.5)
+      failureRate  = Math.max(failureRate, 0.4)
+      latencyAddMs += 50
       continue
     }
 
@@ -123,8 +148,15 @@ export function buildChaosModifier(
     }
 
     if (['APP_DEP_TIMEOUT'].includes(id)) {
-      rpsMult     = Math.min(rpsMult, 0.5)
-      failureRate = Math.max(failureRate, 0.3)
+      rpsMult      = Math.min(rpsMult, 0.5)
+      failureRate  = Math.max(failureRate, 0.3)
+      latencyAddMs += 50
+      continue
+    }
+
+    if (id === 'NET_IDLE_TIMEOUT') {
+      failureRate  = Math.max(failureRate, 0.1)
+      latencyAddMs += (cfg.value as number) ?? 200
       continue
     }
 
@@ -134,7 +166,7 @@ export function buildChaosModifier(
     }
   }
 
-  return { rpsMult, failureRate, utilFloor }
+  return { rpsMult, failureRate, utilFloor, latencyAddMs }
 }
 
 // ── Output type ───────────────────────────────────────────────────────────────

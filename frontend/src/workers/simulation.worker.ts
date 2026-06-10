@@ -196,7 +196,8 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     const effectiveIncoming = node.nodeType === NodeType.Client ? 0 : incoming
 
     const outs = outEdges.get(node.id) ?? []
-    const chaosModifier = buildChaosModifier(node.id, workerChaos)
+    const inEdgeIds = (inEdges.get(node.id) ?? []).map(e => e.edgeId)
+    const chaosModifier = buildChaosModifier(node.id, inEdgeIds, workerChaos)
     const flow = computeNodeFlow(node, effectiveIncoming, solverState, tick, tickSecs, chaosModifier)
 
     // Distribute outflow evenly across outgoing edges
@@ -213,6 +214,7 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
       currentRps:     node.nodeType === NodeType.Client ? flow.outRps : effectiveIncoming,
       queueDepth:     flow.queueDepth,
       errorRate:      smoothErr,
+      latencyAddMs:   chaosModifier.latencyAddMs > 0 ? chaosModifier.latencyAddMs : undefined,
     }
   }
 

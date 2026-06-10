@@ -199,6 +199,17 @@ class GraphStore {
     this.diagramId = id
     this.isDirty   = false
   }
+
+  nodesWithinBounds(x: number, y: number, w: number, h: number): string[] {
+    const ids: string[] = []
+    for (const node of this.nodes.values()) {
+      if (
+        node.position.x >= x && node.position.x <= x + w &&
+        node.position.y >= y && node.position.y <= y + h
+      ) ids.push(node.id)
+    }
+    return ids
+  }
 }
 
 export const graphStore = new GraphStore()

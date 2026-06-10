@@ -585,6 +585,8 @@ export interface NodeRuntimeState {
   queueDepth: number;
   /** Rolling error rate 0–1 over the last 5 seconds. */
   errorRate: number;
+  /** Extra latency added by active chaos scenarios on this node or its incoming edges (ms). */
+  latencyAddMs?: number;
 }
 
 export interface EdgeFlowState {
