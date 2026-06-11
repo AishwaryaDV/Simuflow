@@ -163,12 +163,29 @@ function topoSort(
   return result
 }
 
+// ── Edge chaos helper ─────────────────────────────────────────────────────────
+
+/** Apply edge-level chaos scenarios to a single edge's RPS. Called after distribution. */
+function applyEdgeChaos(edgeId: string, rps: number, tick: number): number {
+  for (const scenario of workerChaos.values()) {
+    if (!scenario.targetEdgeIds.includes(edgeId)) continue
+    const id  = scenario.scenarioId
+    const cfg = scenario.config as Record<string, unknown>
+    if (id === 'NET_PARTITION' || id === 'NET_CROSS_REGION') return 0
+    if (id === 'NET_PACKET_LOSS') rps *= 1 - ((cfg.cap as number) ?? 50) / 100
+    if (id === 'NET_FLAPPING') rps = Math.floor(tick / 10) % 2 === 0 ? rps : 0
+  }
+  return rps
+}
+
 // ── Frame ─────────────────────────────────────────────────────────────────────
 
 function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
   const { nodes, edges } = topo
   const simNodes = nodes.filter(n => n.nodeType !== undefined)
   const tickSecs = TICK_SECS * speed
+
+  const edgeMap = new Map(edges.map(e => [e.id, e]))
 
   const { outEdges, inEdges } = buildAdjacency(simNodes, edges)
   const sorted = topoSort(simNodes, inEdges, outEdges)
@@ -187,6 +204,14 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     }
   }
 
+  // Pre-compute which edges are fully partitioned for isPartitioned flag
+  const partitionedEdgeIds = new Set<string>()
+  for (const scenario of workerChaos.values()) {
+    if (scenario.scenarioId === 'NET_PARTITION' || scenario.scenarioId === 'NET_CROSS_REGION') {
+      for (const eid of scenario.targetEdgeIds) partitionedEdgeIds.add(eid)
+    }
+  }
+
   const nodeStates: Record<string, NodeRuntimeState> = {}
 
   for (const node of sorted) {
@@ -195,17 +220,27 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
 
     const effectiveIncoming = node.nodeType === NodeType.Client ? 0 : incoming
 
-    const outs = outEdges.get(node.id) ?? []
+    const outs      = outEdges.get(node.id) ?? []
     const inEdgeIds = (inEdges.get(node.id) ?? []).map(e => e.edgeId)
     const chaosModifier = buildChaosModifier(node.id, inEdgeIds, workerChaos)
     const flow = computeNodeFlow(node, effectiveIncoming, solverState, tick, tickSecs, chaosModifier)
 
-    // Distribute outflow evenly across outgoing edges
-    const perEdge = outs.length > 0 ? flow.outRps / outs.length : 0
-    for (const { edgeId } of outs) edgeRps.set(edgeId, perEdge)
+    // Weighted distribution with bandwidth cap + edge chaos
+    const totalWeight = outs.reduce((s, { edgeId }) => s + (edgeMap.get(edgeId)?.weight ?? 1), 0) || 1
+    for (const { edgeId } of outs) {
+      const edge = edgeMap.get(edgeId)
+      const w    = edge?.weight ?? 1
+      let   rps  = flow.outRps * (w / totalWeight)
+      if (edge?.bandwidthRps && edge.bandwidthRps > 0) rps = Math.min(rps, edge.bandwidthRps)
+      edgeRps.set(edgeId, applyEdgeChaos(edgeId, rps, tick))
+    }
     outflow.set(node.id, flow.outRps)
 
     const smoothErr = solverState.rollingError(node.id, flow.errorRate)
+
+    // Sum fixed latency overheads from all incoming edges
+    const edgeLatencyMs = inEdgeIds.reduce((s, eid) => s + (edgeMap.get(eid)?.latencyMs ?? 0), 0)
+    const totalLatencyAdd = chaosModifier.latencyAddMs + edgeLatencyMs
 
     nodeStates[node.id] = {
       nodeId:         node.id,
@@ -214,12 +249,12 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
       currentRps:     node.nodeType === NodeType.Client ? flow.outRps : effectiveIncoming,
       queueDepth:     flow.queueDepth,
       errorRate:      smoothErr,
-      latencyAddMs:   chaosModifier.latencyAddMs > 0 ? chaosModifier.latencyAddMs : undefined,
+      latencyAddMs:   totalLatencyAdd > 0 ? totalLatencyAdd : undefined,
     }
   }
 
   const globalMetrics = aggregateMetrics(simNodes, nodeStates, outflow, tick, speed)
-  const edgeFlows     = emitEdgeFlows(edges, edgeRps)
+  const edgeFlows     = emitEdgeFlows(edges, edgeRps, nodeStates, partitionedEdgeIds)
   const bottlenecks   = Object.values(nodeStates)
     .filter(s => s.utilisationPct > 90)
     .map(s => s.nodeId)

@@ -6,22 +6,26 @@
  * One particle per 50 RPS, minimum 0 when edge is idle.
  */
 
-import type { SimEdge, EdgeFlowState } from '../types/topology'
+import type { SimEdge, EdgeFlowState, NodeRuntimeState } from '../types/topology'
 
 export function emitEdgeFlows(
-  edges:   SimEdge[],
-  edgeRps: Map<string, number>,
+  edges:            SimEdge[],
+  edgeRps:          Map<string, number>,
+  nodeStates:       Record<string, NodeRuntimeState>,
+  partitionedEdges: Set<string>,
 ): Record<string, EdgeFlowState> {
   const result: Record<string, EdgeFlowState> = {}
 
   for (const edge of edges) {
-    const rps = edgeRps.get(edge.id) ?? 0
+    const rps          = edgeRps.get(edge.id) ?? 0
+    const targetState  = nodeStates[edge.targetId]
+    const isPartitioned = partitionedEdges.has(edge.id)
     result[edge.id] = {
       edgeId:        edge.id,
-      particleCount: Math.min(12, Math.ceil(rps / 50)),
+      particleCount: isPartitioned ? 0 : Math.min(12, Math.ceil(rps / 50)),
       throughput:    rps,
-      errorRatio:    0,
-      isPartitioned: false,
+      errorRatio:    targetState?.errorRate ?? 0,
+      isPartitioned,
     }
   }
 

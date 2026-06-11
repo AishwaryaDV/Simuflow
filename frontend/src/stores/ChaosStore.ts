@@ -1,7 +1,7 @@
-import { makeObservable, observable, action, computed } from 'mobx'
+import { makeObservable, observable, action, computed, reaction, runInAction } from 'mobx'
 import { nanoid } from 'nanoid'
 import type { ActiveScenario, ChaosEvent, ChaosScenarioDef } from '../types/topology'
-import { ChaosScenarioId, NodeType } from '../types/topology'
+import { ChaosScenarioId, NodeType, SimulationStatus } from '../types/topology'
 import { graphStore } from './GraphStore'
 import { simulationStore } from './SimulationStore'
 
@@ -495,6 +495,18 @@ class ChaosStore {
       deactivateAllOnNode:  action,
       clearAll:             action,
     })
+
+    // Keep SimulationStatus.Chaos in sync with whether any scenario is active
+    reaction(
+      () => this.isChaosModeActive,
+      (active) => runInAction(() => {
+        if (active && simulationStore.status === SimulationStatus.Running) {
+          simulationStore.status = SimulationStatus.Chaos
+        } else if (!active && simulationStore.status === SimulationStatus.Chaos) {
+          simulationStore.status = SimulationStatus.Running
+        }
+      }),
+    )
   }
 
   // ─── Computed ──────────────────────────────────────────────────────────────
