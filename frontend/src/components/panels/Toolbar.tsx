@@ -8,7 +8,8 @@ import { uiStore } from '../../stores/UIStore'
 import { authStore } from '../../stores/AuthStore'
 import { diagramStore } from '../../stores/DiagramStore'
 import { SimulationStatus } from '../../types/topology'
-import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2 } from 'lucide-react'
+import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2, Link2 } from 'lucide-react'
+import ShareModal from '../ui/ShareModal'
 
 const UserButton = observer(() => {
   const [open, setOpen] = useState(false)
@@ -71,6 +72,7 @@ const Toolbar = observer(() => {
   const { status, elapsedSeconds, speed, isRunning } = simulationStore
   const isIdle   = status === SimulationStatus.Idle
   const isPaused = status === SimulationStatus.Paused
+  const [shareOpen, setShareOpen] = useState(false)
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     runInAction(() => graphStore.setName(e.target.value))
@@ -107,6 +109,8 @@ const Toolbar = observer(() => {
   const handleStop   = useCallback(() => runInAction(() => simulationStore.stop()),  [])
 
   return (
+    <>
+    <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} />
     <header className="h-12 flex items-center px-4 gap-3 bg-app-surface border-b border-app-border shrink-0">
       {/* Brand */}
       <div className="flex items-center gap-2 shrink-0">
@@ -250,8 +254,20 @@ const Toolbar = observer(() => {
 
       <div className="w-px h-5 bg-app-border shrink-0" />
 
+      {/* Share */}
+      <button
+        onClick={() => authStore.requireAuth(() => setShareOpen(true))}
+        disabled={!diagramStore.currentDiagramId}
+        title={diagramStore.currentDiagramId ? 'Share diagram' : 'Save your diagram first to share it'}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-app-border/40 text-app-text-2 hover:text-app-text hover:border-app-border disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+      >
+        <Link2 size={13} strokeWidth={1.8} />
+        <span className="hidden sm:inline">Share</span>
+      </button>
+
       <UserButton />
     </header>
+    </>
   )
 })
 

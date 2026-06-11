@@ -43,6 +43,12 @@ export interface DiagramListResponse {
   pageSize: number
 }
 
+export interface ShareResponse {
+  shareToken: string
+  shareUrl:   string
+  isPublic:   boolean
+}
+
 // ── API surface ───────────────────────────────────────────────────────────────
 
 export const api = {
@@ -67,5 +73,19 @@ export const api = {
 
     delete: (id: string) =>
       request<void>(`/api/v1/diagrams/${id}`, { method: 'DELETE' }),
+
+    share: (id: string) =>
+      request<ShareResponse>(`/api/v1/diagrams/${id}/share`, { method: 'POST' }),
+
+    unshare: (id: string) =>
+      request<void>(`/api/v1/diagrams/${id}/share`, { method: 'DELETE' }),
+  },
+
+  shared: {
+    get: (token: string) =>
+      request<DiagramResponse>(`/api/v1/shared/${token}`),
+
+    fork: (token: string) =>
+      request<{ diagramId: string; name: string }>(`/api/v1/shared/${token}/fork`, { method: 'POST' }),
   },
 }

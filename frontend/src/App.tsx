@@ -8,7 +8,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<WorkspaceLayout />} />
-        <Route path="/view/:token" element={<SharedViewPage />} />
+        <Route path="/shared/:token" element={<SharedViewPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
