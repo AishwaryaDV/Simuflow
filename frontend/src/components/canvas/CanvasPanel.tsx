@@ -282,19 +282,10 @@ const CanvasPanel = observer(() => {
         y: Math.round(raw.y / SNAP_GRID[1]) * SNAP_GRID[1],
       }
 
-      const chaosId = e.dataTransfer.getData('application/simuflow-chaos-id')
-
       if (simType && SIM_TYPES.has(simType)) {
         runInAction(() => graphStore.addNode(createDefaultNode(simType, position)))
       } else if (structType && STRUCT_TYPES.has(structType)) {
         runInAction(() => graphStore.addStructuralNode(createDefaultStructuralNode(structType, position)))
-      } else if (chaosId) {
-        const isRunning = simulationStore.status === SimulationStatus.Running ||
-                          simulationStore.status === SimulationStatus.Chaos
-        if (!isRunning) {
-          runInAction(() => uiStore.showToast('Start simulation to inject chaos'))
-        }
-        // Inject flow (target picker + config) wired in Phase 3
       }
     },
     [screenToFlowPosition],
