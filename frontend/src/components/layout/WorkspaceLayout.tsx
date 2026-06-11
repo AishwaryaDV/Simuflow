@@ -14,6 +14,7 @@ import ValidationErrorModal from '../ui/ValidationErrorModal'
 import ValidationWarningSheet from '../ui/ValidationWarningSheet'
 import Toast from '../ui/Toast'
 import AuthModal from '../ui/AuthModal'
+import DiagramsModal from '../ui/DiagramsModal'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
@@ -39,6 +40,7 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
   return (
     <ReactFlowProvider>
       <AuthModal />
+      <DiagramsModal />
       <ConfirmDialog />
       <ValidationErrorModal />
       <ValidationWarningSheet />

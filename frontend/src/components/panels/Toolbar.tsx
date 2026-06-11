@@ -6,8 +6,9 @@ import { simulationStore } from '../../stores/SimulationStore'
 import { validationStore } from '../../stores/ValidationStore'
 import { uiStore } from '../../stores/UIStore'
 import { authStore } from '../../stores/AuthStore'
+import { diagramStore } from '../../stores/DiagramStore'
 import { SimulationStatus } from '../../types/topology'
-import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut } from 'lucide-react'
+import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2 } from 'lucide-react'
 
 const UserButton = observer(() => {
   const [open, setOpen] = useState(false)
@@ -128,9 +129,29 @@ const Toolbar = observer(() => {
         aria-label="Diagram name"
       />
 
-      {graphStore.isDirty && (
-        <span className="text-[10px] font-medium text-app-text-3 shrink-0">unsaved</span>
-      )}
+      {/* My Diagrams */}
+      <button
+        onClick={() => authStore.requireAuth(() => { diagramStore.openList() })}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-app-border/40 text-app-text-2 hover:text-app-text hover:border-app-border transition-colors shrink-0"
+        title="My Diagrams"
+      >
+        <FolderOpen size={13} strokeWidth={1.8} />
+        <span className="hidden sm:inline">My Diagrams</span>
+      </button>
+
+      {/* Save */}
+      <button
+        onClick={() => authStore.requireAuth(() => diagramStore.save())}
+        disabled={diagramStore.isSaving || !graphStore.isDirty}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-app-accent/50 text-app-accent hover:bg-app-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+        title="Save diagram"
+      >
+        {diagramStore.isSaving
+          ? <Loader2 size={13} className="animate-spin" />
+          : <Save size={13} strokeWidth={1.8} />
+        }
+        <span className="hidden sm:inline">{diagramStore.isSaving ? 'Saving…' : 'Save'}</span>
+      </button>
 
       <div className="flex-1" />
 
