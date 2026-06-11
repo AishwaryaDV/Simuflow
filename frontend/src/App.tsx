@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import WorkspaceLayout from './components/layout/WorkspaceLayout'
-
-const SharedViewPage = () => <div className="p-8 text-gray-500">Shared view — coming in Phase 5</div>
+import SharedViewPage from './pages/SharedViewPage'
 
 function App() {
   return (
