@@ -1,7 +1,7 @@
 import { makeObservable, observable, action, runInAction } from 'mobx'
 import { api, type DiagramSummary } from '../lib/api'
 import { graphStore } from './GraphStore'
-import type { TopologySchema } from '../types/topology'
+import { TOPOLOGY_VERSION, type TopologySchema } from '../types/topology'
 
 class DiagramStore {
   currentDiagramId: string | null = null
@@ -29,7 +29,7 @@ class DiagramStore {
 
   private buildTopology(): TopologySchema {
     return {
-      version:        '1.0',
+      version:        TOPOLOGY_VERSION,
       nodes:          Array.from(graphStore.nodes.values()),
       edges:          Array.from(graphStore.edges.values()),
       structuralNodes: Array.from(graphStore.structuralNodes.values()),

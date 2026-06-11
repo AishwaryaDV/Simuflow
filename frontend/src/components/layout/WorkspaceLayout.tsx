@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { observer } from 'mobx-react-lite'
 import Toolbar from '../panels/Toolbar'
@@ -18,6 +19,7 @@ import DiagramsModal from '../ui/DiagramsModal'
 import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersistence'
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
+import { graphStore } from '../../stores/GraphStore'
 
 /**
  * 5-zone workspace shell:
@@ -36,6 +38,14 @@ import { uiStore } from '../../stores/UIStore'
 const WorkspaceLayout = observer(function WorkspaceLayout() {
   useLocalStoragePersistence()
   useWorkerBridge()
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (graphStore.isDirty) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
 
   return (
     <ReactFlowProvider>

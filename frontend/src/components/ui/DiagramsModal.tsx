@@ -3,9 +3,23 @@ import { observer } from 'mobx-react-lite'
 import { X, FolderOpen, Trash2, Plus, Loader2, FileText } from 'lucide-react'
 import { diagramStore } from '../../stores/DiagramStore'
 import { uiStore } from '../../stores/UIStore'
+import { graphStore } from '../../stores/GraphStore'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function guardUnsaved(proceed: () => void) {
+  if (graphStore.isDirty) {
+    uiStore.openConfirm(
+      'Unsaved changes',
+      'You have unsaved changes. Discard them and continue?',
+      proceed,
+      true,
+    )
+  } else {
+    proceed()
+  }
 }
 
 const DiagramsModal = observer(() => {
@@ -38,7 +52,7 @@ const DiagramsModal = observer(() => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) }}
+              onClick={() => guardUnsaved(() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) })}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white transition-colors"
             >
               <Plus size={12} strokeWidth={2.5} />
@@ -61,7 +75,7 @@ const DiagramsModal = observer(() => {
               <FileText size={32} className="text-app-text-3 opacity-40" />
               <p className="text-sm text-app-text-3">No saved diagrams yet</p>
               <button
-                onClick={() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) }}
+                onClick={() => guardUnsaved(() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) })}
                 className="text-xs text-app-accent hover:underline"
               >
                 Start with a blank canvas
@@ -83,7 +97,7 @@ const DiagramsModal = observer(() => {
                   </div>
                   <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => diagramStore.loadDiagram(d.id)}
+                      onClick={() => guardUnsaved(() => diagramStore.loadDiagram(d.id))}
                       className="text-xs px-2.5 py-1 rounded-md border border-app-border text-app-text-2 hover:text-app-text hover:border-app-accent/50 transition-colors"
                     >
                       Open
