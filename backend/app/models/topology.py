@@ -39,7 +39,7 @@ class NodeType(str, Enum):
     vector_db           = "vector_db"
     agent_orchestrator  = "agent_orchestrator"
     dns                 = "dns"
-    no_sql_store        = "no_sql_store"
+    nosql_store         = "nosql_store"
     waf                 = "waf"
     observability_mesh  = "observability_mesh"
     tool_registry       = "tool_registry"
@@ -97,7 +97,14 @@ class EdgeDef(SimuFlowBase):
 # ── TopologySchema ─────────────────────────────────────────────────────────────
 
 class TopologySchema(SimuFlowBase):
-    version:  str          = "1.0"
-    nodes:    list[NodeDef]
-    edges:    list[EdgeDef]
-    viewport: CanvasViewport
+    model_config = ConfigDict(
+        populate_by_name=True,
+        alias_generator=to_camel,
+        extra="allow",
+    )
+
+    version:          str          = "1.0"
+    nodes:            list[NodeDef]
+    edges:            list[EdgeDef]
+    viewport:         CanvasViewport
+    structural_nodes: list[Any]    = Field(default_factory=list)

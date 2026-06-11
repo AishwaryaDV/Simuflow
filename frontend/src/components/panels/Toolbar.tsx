@@ -1,12 +1,56 @@
-import { useCallback } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
 import { simulationStore } from '../../stores/SimulationStore'
 import { validationStore } from '../../stores/ValidationStore'
 import { uiStore } from '../../stores/UIStore'
+import { authStore } from '../../stores/AuthStore'
 import { SimulationStatus } from '../../types/topology'
-import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown } from 'lucide-react'
+import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut } from 'lucide-react'
+
+const UserButton = observer(() => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  if (!authStore.isAuthenticated) {
+    return (
+      <button
+        onClick={() => authStore.openModal()}
+        className="text-xs px-3 py-1.5 rounded-lg border border-app-border/40 text-app-text-2 hover:text-app-text hover:border-app-border transition-colors"
+      >
+        Sign in
+      </button>
+    )
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-7 h-7 rounded-full bg-app-accent flex items-center justify-center text-white text-xs font-semibold select-none hover:bg-app-accent-dim transition-colors"
+        title={authStore.user?.email}
+      >
+        {authStore.avatarInitials}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-9 z-50 min-w-[180px] bg-app-surface border border-app-border rounded-xl shadow-xl overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-app-border">
+            <p className="text-[11px] text-app-text-3 truncate">{authStore.user?.email}</p>
+          </div>
+          <button
+            onClick={async () => { setOpen(false); await authStore.signOut() }}
+            className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut size={13} strokeWidth={1.8} />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+})
 
 const SPEEDS: { label: string; value: 0.25 | 0.5 | 1 | 2 | 4 }[] = [
   { label: '0.25×', value: 0.25 },
@@ -182,6 +226,10 @@ const Toolbar = observer(() => {
         <Trash2 size={13} strokeWidth={1.8} />
         <span className="hidden sm:inline">Reset</span>
       </button>
+
+      <div className="w-px h-5 bg-app-border shrink-0" />
+
+      <UserButton />
     </header>
   )
 })

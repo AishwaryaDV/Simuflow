@@ -19,10 +19,6 @@ create policy "authenticated users can read active presets"
   to authenticated
   using (is_active = true);
 
--- Seed data — topology values loaded from preset JSON files at migration time.
--- Run: psql $DATABASE_URL -f 002_create_presets.sql
--- Or via Supabase CLI: supabase db push
-
 insert into presets (slug, name, description, category, sort_order, topology) values
 (
   'web_app',
@@ -75,13 +71,7 @@ insert into presets (slug, name, description, category, sort_order, topology) va
     ],
     "viewport": {"x":0,"y":0,"zoom":1}
   }'::jsonb
-);
-
--- Remaining presets (url_shortener, social_feed, video_streaming, ride_sharing, ai_agent)
--- are seeded via individual INSERT statements below.
--- Their full topology JSON is sourced from frontend/src/presets/*.json.
--- Add them here following the same pattern once the JSON files are finalised.
-,
+),
 (
   'url_shortener',
   'URL Shortener at Scale',
