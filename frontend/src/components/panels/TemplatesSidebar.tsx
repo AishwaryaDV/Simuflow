@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import {
@@ -13,11 +13,12 @@ import { uiStore } from '../../stores/UIStore'
 import { SimulationStatus } from '../../types/topology'
 import {
   TEMPLATES,
-  TEMPLATES_BY_CATEGORY,
   CATEGORY_LABELS,
   type Template,
   type TemplateCategory,
 } from '../../templates/index'
+import { api } from '../../lib/api'
+import type { TopologySchema } from '../../types/topology'
 
 // ── Icon + colour maps ────────────────────────────────────────────────────────
 
@@ -34,8 +35,6 @@ const TEMPLATE_ICONS: Record<string, LucideIcon> = {
 }
 
 const ICON_STYLE = 'text-app-accent bg-app-accent/10'
-
-const CATEGORY_ORDER: TemplateCategory[] = ['fundamentals', 'distributed', 'ai']
 
 // ── Template card ──────────────────────────────────────────────────────────────
 
@@ -161,14 +160,37 @@ function DetailsView({ template, onBack }: { template: Template; onBack: () => v
 
 // ── Main sidebar ───────────────────────────────────────────────────────────────
 
+const CATEGORY_ORDER: TemplateCategory[] = ['fundamentals', 'distributed', 'ai']
+
 const TemplatesSidebar = observer(() => {
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
+  const [templates, setTemplates]     = useState<Template[]>(TEMPLATES)
+
+  // Fetch topologies from API and merge into local template list.
+  // Local templates are the fallback if the API is unreachable.
+  useEffect(() => {
+    api.presets.list()
+      .then(presets => {
+        setTemplates(prev => prev.map(t => {
+          const preset = presets.find(p => p.slug === t.slug)
+          return preset ? { ...t, topology: preset.topology as TopologySchema } : t
+        }))
+      })
+      .catch(() => {}) // keep local data on failure
+  }, [])
+
+  const templatesByCategory = useMemo(() =>
+    CATEGORY_ORDER.reduce<Record<TemplateCategory, Template[]>>(
+      (acc, cat) => { acc[cat] = templates.filter(t => t.category === cat); return acc },
+      { fundamentals: [], distributed: [], ai: [] },
+    ),
+  [templates])
 
   const isSimRunning = simulationStore.status !== SimulationStatus.Idle
 
   // Derive details view from UIStore — so the bulb badge can drive it from outside
   const detailsFor = uiStore.templateDetailsOpen && uiStore.loadedTemplateSlug
-    ? (TEMPLATES.find(t => t.slug === uiStore.loadedTemplateSlug) ?? null)
+    ? (templates.find(t => t.slug === uiStore.loadedTemplateSlug) ?? null)
     : null
 
   const doLoad = useCallback((template: Template) => {
@@ -262,15 +284,15 @@ const TemplatesSidebar = observer(() => {
           {/* Template list — scrollable */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
             {CATEGORY_ORDER.map(category => {
-              const templates = TEMPLATES_BY_CATEGORY[category]
-              if (!templates.length) return null
+              const cats = templatesByCategory[category]
+              if (!cats.length) return null
               return (
                 <section key={category}>
                   <p className="text-[10px] font-bold text-app-text-3 uppercase tracking-wider mb-2 px-1">
                     {CATEGORY_LABELS[category]}
                   </p>
                   <div className="space-y-2">
-                    {templates.map(t => (
+                    {cats.map((t: Template) => (
                       <TemplateCard
                         key={t.slug}
                         template={t}

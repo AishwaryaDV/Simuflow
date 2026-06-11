@@ -43,6 +43,15 @@ export interface DiagramListResponse {
   pageSize: number
 }
 
+export interface PresetBlueprint {
+  slug:        string
+  name:        string
+  description: string
+  category:    string
+  sortOrder:   number
+  topology:    unknown
+}
+
 export interface ShareResponse {
   shareToken: string
   shareUrl:   string
@@ -79,6 +88,10 @@ export const api = {
 
     unshare: (id: string) =>
       request<void>(`/api/v1/diagrams/${id}/share`, { method: 'DELETE' }),
+  },
+
+  presets: {
+    list: () => request<PresetBlueprint[]>('/api/v1/presets'),
   },
 
   shared: {
