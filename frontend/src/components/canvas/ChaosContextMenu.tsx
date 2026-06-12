@@ -340,4 +340,3 @@ const ChaosContextMenu = observer(({ target, onClose }: Props) => {
 })
 
 export default ChaosContextMenu
-export type { ContextMenuTarget }

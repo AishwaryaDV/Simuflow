@@ -667,6 +667,8 @@ export type ChaosConfigSchema =
 export interface ActiveScenario {
   id:            string;
   scenarioId:    ChaosScenarioId;
+  name:          string;
+  tag:           string;
   targetNodeIds: string[];
   targetEdgeIds: string[];
   config:        Record<string, unknown>;

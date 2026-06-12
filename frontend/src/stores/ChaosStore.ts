@@ -601,6 +601,8 @@ class ChaosStore {
     const instance: ActiveScenario = {
       id: nanoid(),
       scenarioId,
+      name:  def.name,
+      tag:   def.tag,
       targetNodeIds,
       targetEdgeIds,
       config,
