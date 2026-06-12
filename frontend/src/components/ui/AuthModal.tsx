@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { X, Eye, EyeOff } from 'lucide-react'
 import { authStore } from '../../stores/AuthStore'
@@ -24,6 +24,20 @@ const AuthModal = observer(() => {
   const [error, setError]           = useState<string | null>(null)
   const [info, setInfo]             = useState<string | null>(null)
   const [loading, setLoading]       = useState(false)
+
+  // Reset all state every time the modal opens so stale errors/tabs never show
+  useEffect(() => {
+    if (authStore.modalOpen) {
+      setTab('signin')
+      setEmail('')
+      setPassword('')
+      setNewPassword('')
+      setShowPassword(false)
+      setError(null)
+      setInfo(null)
+      setLoading(false)
+    }
+  }, [authStore.modalOpen])
 
   if (!authStore.modalOpen) return null
 
@@ -135,14 +149,25 @@ const AuthModal = observer(() => {
           {isResetMode ? (
             <form onSubmit={handleNewPasswordSubmit} className="flex flex-col gap-2.5">
               <p className="text-xs text-app-text-3 mb-1">Enter your new password.</p>
-              <input
-                type="password"
-                placeholder="New password (min 6 chars)"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-                className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="New password (min 6 chars)"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full text-xs bg-app-elevated border border-app-border rounded-lg px-3 py-2 pr-9 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-app-text-3 hover:text-app-text transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading}
@@ -162,7 +187,7 @@ const AuthModal = observer(() => {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
-                className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                className="w-full text-xs bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
               />
               <button
                 type="submit"
@@ -204,7 +229,7 @@ const AuthModal = observer(() => {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   autoComplete="email"
-                  className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                  className="w-full text-xs bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
                 />
                 <div className="relative">
                   <input
@@ -213,7 +238,7 @@ const AuthModal = observer(() => {
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     autoComplete={tab === 'signin' ? 'current-password' : 'new-password'}
-                    className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 pr-9 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                    className="w-full text-xs bg-app-elevated border border-app-border rounded-lg px-3 py-2 pr-9 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
                   />
                   <button
                     type="button"

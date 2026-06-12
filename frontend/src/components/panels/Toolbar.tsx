@@ -145,7 +145,10 @@ const Toolbar = observer(() => {
 
       {/* Save */}
       <button
-        onClick={() => authStore.requireAuth(() => diagramStore.save())}
+        onClick={() => authStore.requireAuth(async () => {
+          try { await diagramStore.save() }
+          catch { uiStore.showToast('Failed to save. Please try again.') }
+        })}
         disabled={diagramStore.isSaving || !graphStore.isDirty}
         className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-app-accent/50 text-app-accent hover:bg-app-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
         title="Save diagram"
