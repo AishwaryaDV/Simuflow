@@ -7,17 +7,19 @@ class AuthStore {
   user: User | null       = null
   loading                 = true
   modalOpen               = false
+  resetPasswordMode       = false
 
   constructor() {
     makeObservable(this, {
-      session:         observable,
-      user:            observable,
-      loading:         observable,
-      modalOpen:       observable,
-      isAuthenticated: computed,
-      setSession:      action,
-      openModal:       action,
-      closeModal:      action,
+      session:           observable,
+      user:              observable,
+      loading:           observable,
+      modalOpen:         observable,
+      resetPasswordMode: observable,
+      isAuthenticated:   computed,
+      setSession:        action,
+      openModal:         action,
+      closeModal:        action,
     })
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -30,7 +32,12 @@ class AuthStore {
     supabase.auth.onAuthStateChange((_event, session) => {
       runInAction(() => {
         this.setSession(session)
-        if (session) this.modalOpen = false
+        if (_event === 'PASSWORD_RECOVERY') {
+          this.resetPasswordMode = true
+          this.modalOpen = true
+        } else if (session) {
+          this.modalOpen = false
+        }
       })
     })
   }
@@ -67,7 +74,23 @@ class AuthStore {
   }
 
   async signUpWithEmail(email: string, password: string): Promise<string | null> {
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: window.location.origin },
+    })
+    return error?.message ?? null
+  }
+
+  async sendPasswordReset(email: string): Promise<string | null> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+    return error?.message ?? null
+  }
+
+  async updatePassword(newPassword: string): Promise<string | null> {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (!error) runInAction(() => { this.resetPasswordMode = false })
     return error?.message ?? null
   }
 

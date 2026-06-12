@@ -101,8 +101,10 @@ const SharedViewPage = observer(() => {
         setName(diagram.name)
         setForkCount((diagram as any).forkCount ?? 0)
         setState('ready')
+        document.title = `${diagram.name} — SimuFlow`
       })
       .catch(e => { setErrorMsg(e.message || 'Diagram not found.'); setState('error') })
+    return () => { document.title = 'SimuFlow' }
   }, [token])
 
   const handleFork = useCallback(async () => {

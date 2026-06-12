@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { X } from 'lucide-react'
+import { X, Eye, EyeOff } from 'lucide-react'
 import { authStore } from '../../stores/AuthStore'
 
-type Tab = 'signin' | 'signup'
+type Tab = 'signin' | 'signup' | 'forgot'
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
@@ -16,12 +16,14 @@ const GoogleIcon = () => (
 
 
 const AuthModal = observer(() => {
-  const [tab, setTab]         = useState<Tab>('signin')
-  const [email, setEmail]     = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]     = useState<string | null>(null)
-  const [info, setInfo]       = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [tab, setTab]               = useState<Tab>('signin')
+  const [email, setEmail]           = useState('')
+  const [password, setPassword]     = useState('')
+  const [newPassword, setNewPassword]   = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError]           = useState<string | null>(null)
+  const [info, setInfo]             = useState<string | null>(null)
+  const [loading, setLoading]       = useState(false)
 
   if (!authStore.modalOpen) return null
 
@@ -47,6 +49,29 @@ const AuthModal = observer(() => {
     }
   }
 
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) { setError('Please enter your email.'); return }
+    setLoading(true)
+    reset()
+    const err = await authStore.sendPasswordReset(email)
+    setLoading(false)
+    if (err) setError(err)
+    else setInfo('Reset link sent! Check your email.')
+  }
+
+  const handleNewPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newPassword || newPassword.length < 6) { setError('Password must be at least 6 characters.'); return }
+    setLoading(true)
+    reset()
+    const err = await authStore.updatePassword(newPassword)
+    setLoading(false)
+    if (err) setError(err)
+  }
+
+  const isResetMode = authStore.resetPasswordMode
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
@@ -70,23 +95,25 @@ const AuthModal = observer(() => {
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex bg-app-elevated rounded-lg p-1 gap-1">
-            {(['signin', 'signup'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => handleTabChange(t)}
-                className={[
-                  'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
-                  tab === t
-                    ? 'bg-app-surface text-app-text shadow-sm'
-                    : 'text-app-text-3 hover:text-app-text-2',
-                ].join(' ')}
-              >
-                {t === 'signin' ? 'Sign in' : 'Sign up'}
-              </button>
-            ))}
-          </div>
+          {/* Tabs — hidden in forgot/reset modes */}
+          {!isResetMode && tab !== 'forgot' && (
+            <div className="flex bg-app-elevated rounded-lg p-1 gap-1">
+              {(['signin', 'signup'] as Tab[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => handleTabChange(t)}
+                  className={[
+                    'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
+                    tab === t
+                      ? 'bg-app-surface text-app-text shadow-sm'
+                      : 'text-app-text-3 hover:text-app-text-2',
+                  ].join(' ')}
+                >
+                  {t === 'signin' ? 'Sign in' : 'Sign up'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -104,53 +131,119 @@ const AuthModal = observer(() => {
             </div>
           )}
 
-          {/* OAuth */}
-          <button
-            onClick={() => authStore.signInWithGoogle()}
-            className="flex items-center justify-center gap-2.5 w-full text-sm font-medium py-2 px-4 rounded-lg border border-app-border bg-app-elevated hover:bg-app-surface transition-colors text-app-text"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
+          {/* Set new password — shown after clicking reset link in email */}
+          {isResetMode ? (
+            <form onSubmit={handleNewPasswordSubmit} className="flex flex-col gap-2.5">
+              <p className="text-xs text-app-text-3 mb-1">Enter your new password.</p>
+              <input
+                type="password"
+                placeholder="New password (min 6 chars)"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full text-xs font-bold py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors tracking-wide"
+              >
+                {loading ? 'Please wait…' : 'Set new password'}
+              </button>
+            </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-1">
-            <div className="h-px flex-1 bg-app-border" />
-            <span className="text-[11px] text-app-text-3">or</span>
-            <div className="h-px flex-1 bg-app-border" />
-          </div>
+          ) : tab === 'forgot' ? (
+            /* Forgot password view */
+            <form onSubmit={handleForgotSubmit} className="flex flex-col gap-2.5">
+              <p className="text-xs text-app-text-3 mb-1">Enter your email and we'll send a reset link.</p>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full text-xs font-bold py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors tracking-wide"
+              >
+                {loading ? 'Please wait…' : 'Send reset link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange('signin')}
+                className="text-xs text-app-text-3 hover:text-app-text text-center transition-colors"
+              >
+                ← Back to sign in
+              </button>
+            </form>
 
-          {/* Email form */}
-          <form onSubmit={handleEmailSubmit} className="flex flex-col gap-2.5">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              autoComplete="email"
-              className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoComplete={tab === 'signin' ? 'current-password' : 'new-password'}
-              className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full text-sm font-semibold py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-1"
-            >
-              {loading ? 'Please wait…' : tab === 'signin' ? 'Sign in' : 'Create account'}
-            </button>
-          </form>
+          ) : (
+            /* Sign in / Sign up view */
+            <>
+              <button
+                onClick={() => authStore.signInWithGoogle()}
+                className="flex items-center justify-center gap-2.5 w-full text-xs font-bold py-2 px-4 rounded-lg border border-app-border bg-app-elevated hover:bg-app-surface transition-colors text-app-text tracking-wide"
+              >
+                <GoogleIcon />
+                Continue with Google
+              </button>
 
-          {tab === 'signup' && (
-            <p className="text-[10px] text-app-text-3 text-center leading-relaxed">
-              By creating an account you agree to our Terms of Service and Privacy Policy.
-            </p>
+              <div className="flex items-center gap-3 my-1">
+                <div className="h-px flex-1 bg-app-border" />
+                <span className="text-[11px] text-app-text-3">or</span>
+                <div className="h-px flex-1 bg-app-border" />
+              </div>
+
+              <form onSubmit={handleEmailSubmit} className="flex flex-col gap-2.5">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  autoComplete="email"
+                  className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    autoComplete={tab === 'signin' ? 'current-password' : 'new-password'}
+                    className="w-full text-sm bg-app-elevated border border-app-border rounded-lg px-3 py-2 pr-9 text-app-text placeholder:text-app-text-3 focus:outline-none focus:ring-1 focus:ring-app-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-app-text-3 hover:text-app-text transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full text-xs font-bold py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-1 tracking-wide"
+                >
+                  {loading ? 'Please wait…' : tab === 'signin' ? 'Sign in' : 'Create account'}
+                </button>
+              </form>
+
+              {tab === 'signin' && (
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('forgot')}
+                  className="text-xs text-app-text-3 hover:text-app-text text-center transition-colors -mt-1"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

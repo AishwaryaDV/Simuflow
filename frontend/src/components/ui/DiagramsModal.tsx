@@ -24,6 +24,7 @@ function guardUnsaved(proceed: () => void) {
 
 const DiagramsModal = observer(() => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [loadingId,  setLoadingId]  = useState<string | null>(null)
 
   useEffect(() => {
     if (diagramStore.listOpen) diagramStore.fetchList()
@@ -97,10 +98,19 @@ const DiagramsModal = observer(() => {
                   </div>
                   <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => guardUnsaved(() => diagramStore.loadDiagram(d.id))}
-                      className="text-xs px-2.5 py-1 rounded-md border border-app-border text-app-text-2 hover:text-app-text hover:border-app-accent/50 transition-colors"
+                      onClick={async () => {
+                        guardUnsaved(async () => {
+                          setLoadingId(d.id)
+                          try { await diagramStore.loadDiagram(d.id) }
+                          finally { setLoadingId(null) }
+                        })
+                      }}
+                      disabled={loadingId === d.id}
+                      className="text-xs px-2.5 py-1 rounded-md border border-app-border text-app-text-2 hover:text-app-text hover:border-app-accent/50 transition-colors disabled:opacity-40 flex items-center gap-1"
                     >
-                      Open
+                      {loadingId === d.id
+                        ? <Loader2 size={11} className="animate-spin" />
+                        : 'Open'}
                     </button>
                     <button
                       onClick={() => handleDelete(d.id)}
