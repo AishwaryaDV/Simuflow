@@ -35,8 +35,8 @@ Test feature by feature in this order. For each test: note pass/fail and any une
 | 2.8 | Delete a node that has edges | Edges are also removed |
 | 2.9 | Click an edge | Edge config panel opens |
 | 2.10 | Delete an edge | Only edge removed, nodes stay |
-| 2.11 | Undo (Cmd/Ctrl+Z) after add | Node removed |
-| 2.12 | Undo after delete | Node restored |
+| 2.11 | ~~Undo (Cmd/Ctrl+Z) after add~~ | Descoped for launch — no undo stack |
+| 2.12 | ~~Undo after delete~~ | Descoped for launch — no undo stack |
 | 2.13 | Pan and zoom canvas | Viewport moves/scales |
 
 ---
@@ -47,7 +47,7 @@ Test feature by feature in this order. For each test: note pass/fail and any une
 |---|---|---|
 | 3.1 | Add a Database with no upstream | Warning appears (validation badge / sheet) |
 | 3.2 | Add a Client with no downstream | Warning appears |
-| 3.3 | Create a cycle in the graph | Error flagged |
+| 3.3 | Create a cycle in the graph | Warning flagged (cycle nodes highlighted); "Run anyway" allowed |
 | 3.4 | Fix the issue | Badge / warning clears |
 | 3.5 | Click on a validation error | Highlights or jumps to that node |
 | 3.6 | Try to start simulation with errors | Blocked with error modal |
@@ -166,8 +166,13 @@ Test feature by feature in this order. For each test: note pass/fail and any une
 
 ---
 
-## Known gaps to verify after pricing model is done
+## Cost model status
+
+Static AWS-based pricing is live (`CostStore.BASE_HR` / `PER_MILLION_REQ`; per-node base
+rate shown in ConfigPanel). Verify:
 
 - Cost panel rate/hr shows real dollar values (not 0)
-- Spent updates correctly as simulation time advances
+- Spent updates correctly as simulated time advances (speed× real time — not speed²)
 - Over-budget alert fires at correct threshold
+
+Per-node instance/SKU picker + provider pricing API remains post-launch (see docs/pricing-research.md).

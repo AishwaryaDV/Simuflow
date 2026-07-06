@@ -16,7 +16,7 @@ Reference: `backend/SimuFlow_Backend.pdf` for full design doc (DB schema, Pydant
 | **Save / Load** | Diagrams persist to Postgres as `TopologySchema` JSON. Users can save, rename, and load from any device. |
 | **Share links** | Any diagram can generate a public read-only URL (no auth to view). Share token stored on the diagram row. |
 | **Fork** | Authenticated user copies a public shared diagram into their own account. Requires being signed in. |
-| **Presets** | 4 curated architecture blueprints served from DB. Cached in memory at startup — no DB hit per request. |
+| **Presets** | 7 curated architecture blueprints served from DB. Cached in memory at startup — no DB hit per request. |
 
 **What the backend does NOT do:**
 - Run simulations
@@ -49,7 +49,7 @@ Run via Supabase CLI (`supabase db push`).
 | Migration | Contents |
 |---|---|
 | `001_create_diagrams.sql` | `diagrams` table + RLS policies + `updated_at` trigger |
-| `002_create_presets.sql` | `presets` table + seed data for all 4 blueprint presets |
+| `002_create_presets.sql` | `presets` table + seed data for all 7 blueprint presets |
 | `003_add_share_fields.sql` | `is_public`, `share_token`, `fork_count` columns on `diagrams` |
 
 RLS policies (enforced at Postgres layer, not in app code):
@@ -123,7 +123,7 @@ filters by `user_id` manually.
 ## Phase 4 — Presets API
 *Milestone: M6 (~1 day)*
 
-Serves the 4 curated architecture blueprints stored in the `presets` table.
+Serves the curated architecture blueprints stored in the `presets` table.
 
 ### Why a DB, not local JSON?
 - Presets can be toggled active/inactive without a redeploy
@@ -144,10 +144,15 @@ Serves the 4 curated architecture blueprints stored in the `presets` table.
 ### Preset slugs (seed data)
 | Slug | Name |
 |---|---|
-| `web_app` | Basic Web App |
+| `web_app` | Simple Web App |
 | `cached_web_app` | Cached Web App |
-| `microservices` | Microservices |
-| `queue_system` | Queue System |
+| `url_shortener` | URL Shortener at Scale |
+| `social_feed` | Social Media Feed |
+| `video_streaming` | Video Streaming Platform |
+| `ride_sharing` | Real-Time Ride Sharing |
+| `ai_agent` | AI Agent Orchestration |
+
+(`microservices` and `queue_system` ship as frontend-bundled templates and are not DB-seeded.)
 
 ### PresetBlueprint model
 ```

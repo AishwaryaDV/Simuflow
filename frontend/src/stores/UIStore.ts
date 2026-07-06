@@ -1,7 +1,5 @@
 import { makeObservable, observable, computed, action } from 'mobx'
 
-type ActiveModal = 'share' | 'settings' | null
-
 interface ConfirmState {
   open:      boolean
   title:     string
@@ -33,9 +31,6 @@ class UIStore {
     chaos:     false,
     templates: false,
   }
-  activeModal:        ActiveModal    = null
-  theme:              'dark' | 'light' = 'light'
-  onboardingComplete: boolean        = false
   canvasMode:         CanvasMode     = 'select'
   loadedTemplateSlug:   string | null  = _persistedSlug
   templateDetailsOpen:  boolean        = false
@@ -46,9 +41,6 @@ class UIStore {
   constructor() {
     makeObservable(this, {
       panelState:         observable,
-      activeModal:        observable,
-      theme:              observable,
-      onboardingComplete: observable,
       canvasMode:          observable,
       loadedTemplateSlug:   observable,
       templateDetailsOpen:  observable,
@@ -59,10 +51,6 @@ class UIStore {
       togglePanel:        action,
       openPanel:          action,
       closePanel:         action,
-      openModal:          action,
-      closeModal:         action,
-      setTheme:           action,
-      completeOnboarding: action,
       setCanvasMode:       action,
       setLoadedTemplate:    action,
       openTemplateDetails:  action,
@@ -86,22 +74,6 @@ class UIStore {
 
   closePanel(panel: keyof PanelState) {
     this.panelState[panel] = false
-  }
-
-  openModal(modal: NonNullable<ActiveModal>) {
-    this.activeModal = modal
-  }
-
-  closeModal() {
-    this.activeModal = null
-  }
-
-  setTheme(theme: 'dark' | 'light') {
-    this.theme = theme
-  }
-
-  completeOnboarding() {
-    this.onboardingComplete = true
   }
 
   get templateMode(): boolean {

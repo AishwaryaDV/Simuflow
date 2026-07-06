@@ -15,7 +15,7 @@ import type {
   ObservabilityMeshConfig, ToolRegistryConfig, MemoryFabricConfig,
 } from '../../types/topology'
 import { NODE_DISPLAY, STRUCTURAL_DISPLAY } from '../canvas/nodeConfig'
-import { costStore } from '../../stores/CostStore'
+import { BASE_HR } from '../../stores/CostStore'
 import { chaosStore } from '../../stores/ChaosStore'
 
 // ── Shared field primitives ───────────────────────────────────────────────────
@@ -57,7 +57,9 @@ function NumInput({ value, onChange, min, max, step }: {
       onBlur={() => {
         const n = Number(local)
         if (!isNaN(n) && local.trim() !== '') {
-          const clamped = min !== undefined ? Math.max(min, n) : n
+          let clamped = n
+          if (min !== undefined) clamped = Math.max(min, clamped)
+          if (max !== undefined) clamped = Math.min(max, clamped)
           onChange(clamped)
           setLocal(String(clamped))
         } else {
@@ -542,46 +544,12 @@ function StructuralFields({ nodeId }: { nodeId: string }) {
   )
 }
 
-// ── Cost placeholder ──────────────────────────────────────────────────────────
-// TODO: replace hardcoded rates with per-node instance/SKU picker + cloud
-// provider pricing API. See CostStore.ts BASE_HR / PER_MILLION_REQ tables.
+// ── Node cost hint ────────────────────────────────────────────────────────────
+// Static AWS-based rates shared with the cost panel (CostStore.BASE_HR).
 
-function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
+function NodeCostHint({ nodeType }: { nodeType: NodeType }) {
   if (nodeType === NodeType.Client) return null
-  const baseHr = (costStore as any)['currentRatePerHr'] // just for display hint
-  void baseHr // unused — we read from the static table directly via store internals
-
-  // Read the hardcoded base rate directly from the pricing table in CostStore
-  // so the panel reflects what the cost panel will charge for this node type.
-  // This is a display-only hint until real pricing is wired in.
-  const BASE_HR_HINT: Partial<Record<NodeType, number>> = {
-    [NodeType.LoadBalancer]:      0.025,
-    [NodeType.ApiServer]:         0.042,
-    [NodeType.Cache]:             0.068,
-    [NodeType.Database]:          0.115,
-    [NodeType.Queue]:             0.001,
-    [NodeType.CDN]:               0.010,
-    [NodeType.Microservice]:      0.042,
-    [NodeType.ApiGateway]:        0.035,
-    [NodeType.Serverless]:        0,
-    [NodeType.Worker]:            0.021,
-    [NodeType.PubSub]:            0.002,
-    [NodeType.Stream]:            0.015,
-    [NodeType.RateLimiter]:       0,
-    [NodeType.ObjectStore]:       0.023,
-    [NodeType.ExternalService]:   0,
-    [NodeType.LLMGateway]:        0,
-    [NodeType.VectorDB]:          0.096,
-    [NodeType.AgentOrchestrator]: 0.500,
-    [NodeType.DNS]:               0.008,
-    [NodeType.NoSQLStore]:        0.095,
-    [NodeType.WAF]:               0.080,
-    [NodeType.GraphDB]:           0.350,
-    [NodeType.ObservabilityMesh]: 0.050,
-    [NodeType.ToolRegistry]:      0.021,
-    [NodeType.MemoryFabric]:      0.068,
-  }
-  const rate = BASE_HR_HINT[nodeType]
+  const rate = BASE_HR[nodeType]
 
   return (
     <div className="flex flex-col gap-2">
@@ -589,23 +557,15 @@ function CostPlaceholder({ nodeType }: { nodeType: NodeType }) {
         <DollarSign size={10} className="text-app-text-3" />
         <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-3">Cost</p>
       </div>
-      <div className="flex flex-col gap-2 bg-app-elevated/40 rounded-xl px-3 py-3 border border-app-border/60 border-dashed opacity-60">
+      <div className="flex flex-col gap-2 bg-app-elevated/40 rounded-xl px-3 py-3 border border-app-border/60">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-app-text-3">Current rate</span>
+          <span className="text-[11px] text-app-text-3">Base rate</span>
           <span className="text-[11px] font-bold tabular-nums text-app-text-2">
             {rate !== undefined && rate > 0 ? `$${rate.toFixed(3)}/hr` : 'Per request'}
           </span>
         </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-app-text-2">Instance / SKU</span>
-          <input
-            disabled
-            placeholder="e.g. t3.medium, db.r6g.large…"
-            className="text-xs border border-app-border/50 bg-app-elevated/50 text-app-text-3 rounded-lg px-2.5 py-1.5 w-full cursor-not-allowed"
-          />
-        </div>
-        <p className="text-[10px] text-app-text-3 leading-relaxed italic">
-          Custom instance pricing coming soon — rates sourced from cloud provider APIs.
+        <p className="text-[10px] text-app-text-3 leading-relaxed">
+          Estimated from typical AWS pricing. Request-priced services accrue with live RPS in the cost panel.
         </p>
       </div>
     </div>
@@ -798,7 +758,7 @@ const ConfigPanel = observer(() => {
         </FieldGroup>
         <ActiveChaosSection nodeId={nodeId!} />
         {renderConfigFields()}
-        <CostPlaceholder nodeType={node.nodeType} />
+        <NodeCostHint nodeType={node.nodeType} />
         <NodeAdvisories nodeId={nodeId!} />
       </div>
     </aside>

@@ -8,6 +8,8 @@ import type { TopologySchema } from '../types/topology'
 
 import webApp          from '../presets/web_app.json'
 import cachedWebApp    from '../presets/cached_web_app.json'
+import microservices   from '../presets/microservices.json'
+import queueSystem     from '../presets/queue_system.json'
 import urlShortener    from '../presets/url_shortener.json'
 import socialFeed      from '../presets/social_feed.json'
 import videoStreaming  from '../presets/video_streaming.json'
@@ -104,6 +106,67 @@ export const TEMPLATES: Template[] = [
       tryThis:
         'Set the cache hit rate to 0.0 to simulate a cold cache (e.g. after a deploy flush) ' +
         'and observe how quickly the database saturates. This is a Cache Stampede scenario.',
+    },
+  },
+
+  {
+    slug:        'microservices',
+    name:        'Microservices',
+    description: 'API gateway fans out to three independent services, each with its own database.',
+    category:    'fundamentals',
+    topology:    microservices.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'The database-per-service pattern: an API gateway routes traffic to three independent ' +
+        'services — Users, Orders and Payments — each owning its data store. Services fail and ' +
+        'scale independently, but synchronous calls between them (Orders → Payments) couple their ' +
+        'availability: if Payments degrades, Orders feels it immediately.',
+      components: [
+        { name: 'Mobile Client',    role: 'Generates 150 RPS with burst mode on — traffic spikes every few seconds.' },
+        { name: 'API Gateway',      role: 'Single entry point, routes to all three services. 5,000 RPS capacity.' },
+        { name: 'User Service',     role: 'Read-heavy. 800 RPS capacity, 30ms latency.' },
+        { name: 'Order Service',    role: 'Calls Payment Service synchronously for charges — a hidden coupling.' },
+        { name: 'Payment Service',  role: 'Slowest and least reliable (80ms, 2% failure) — the weak link in the chain.' },
+        { name: 'Per-service DBs',  role: 'Users, Orders and Payments each own their database — no shared state.' },
+      ],
+      watchFor: [
+        'Payment Service saturates first — lowest capacity (400 RPS) and highest latency.',
+        'Order Service errors track Payment Service health because of the synchronous charge call.',
+        'Each database only sees its own service’s traffic — no shared bottleneck, unlike the 3-tier app.',
+      ],
+      tryThis:
+        'Right-click the Payment Service during a run and inject an Instance Crash. Watch how ' +
+        'Order Service errors climb while User Service stays healthy — that isolation (and its ' +
+        'limits) is the whole argument for and against microservices.',
+    },
+  },
+  {
+    slug:        'queue_system',
+    name:        'Queue-Based Worker',
+    description: 'API decouples writes from processing via a message queue. Workers drain the queue asynchronously.',
+    category:    'fundamentals',
+    topology:    queueSystem.topology as unknown as TopologySchema,
+    details: {
+      overview:
+        'Asynchronous decoupling 101: the API accepts writes fast (10ms) and enqueues a job instead ' +
+        'of processing inline. Two workers drain the queue at their own pace and persist results. ' +
+        'The client sees consistent low latency even when processing capacity is exceeded — the ' +
+        'queue absorbs the difference, at the cost of processing lag.',
+      components: [
+        { name: 'API Client',   role: '500 RPS with bursts — more than the workers can process in real time.' },
+        { name: 'API Server',   role: 'Fast accept-and-enqueue. 2,000 RPS capacity, 10ms latency.' },
+        { name: 'Job Queue',    role: 'Buffer between ingestion and processing. Max depth 5,000 — then messages drop.' },
+        { name: 'Worker A / B', role: '300 RPS each (600 combined) — deliberately less than incoming bursts.' },
+        { name: 'Results DB',   role: 'Write target for processed jobs. 1,000 RPS — never the bottleneck here.' },
+      ],
+      watchFor: [
+        'Queue depth climbing during bursts and draining between them — the core queue dynamic.',
+        'API latency stays flat even when workers are saturated — that’s the decoupling win.',
+        'If sustained input exceeds 600 RPS, depth grows until it hits the 5,000 cap.',
+      ],
+      tryThis:
+        'Raise Client RPS to 1,000 and watch queue depth grow unbounded toward its cap. Then ' +
+        'inject a Queue Backlog Explosion on the Job Queue to see the same failure arrive instantly.',
     },
   },
 
