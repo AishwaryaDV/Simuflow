@@ -25,9 +25,10 @@ export interface ChaosModifier {
   failureRate:  number   // -1 = use node's own; 0–1 overrides
   utilFloor:    number   // -1 = no floor; 0–1 = minimum utilisation
   latencyAddMs: number   // extra ms added to node's base latency contribution
+  hitRateOverride: number // -1 = use node's own; 0–1 overrides cache/CDN hit rate
 }
 
-const NO_CHAOS: ChaosModifier = { rpsMult: 1, failureRate: -1, utilFloor: -1, latencyAddMs: 0 }
+const NO_CHAOS: ChaosModifier = { rpsMult: 1, failureRate: -1, utilFloor: -1, latencyAddMs: 0, hitRateOverride: -1 }
 
 // Severity → multiplier / floor / latency tables
 const SEV_RPS:     Record<string, number> = { mild: 0.7, moderate: 0.4, severe: 0.1 }
@@ -39,11 +40,13 @@ export function buildChaosModifier(
   nodeId:          string,
   incomingEdgeIds: string[],
   workerChaos:     Map<string, ActiveScenario>,
+  tick:            number = 0,
 ): ChaosModifier {
   let rpsMult      = 1
   let failureRate  = -1
   let utilFloor    = -1
   let latencyAddMs = 0
+  let hitRateOverride = -1
 
   for (const scenario of workerChaos.values()) {
     const targetsNode = scenario.targetNodeIds.includes(nodeId)
@@ -164,9 +167,39 @@ export function buildChaosModifier(
       utilFloor = 1.0
       continue
     }
+
+    // GC pause — periodic stop-the-world freeze. cfg.value = pause interval (ms).
+    // The node freezes for ~20% of each interval; latency spikes during the pause.
+    if (id === 'APP_GC_PAUSE') {
+      const intervalMs  = (cfg.value as number) ?? 500
+      const periodTicks = Math.max(2, Math.round(intervalMs / 200))
+      const pauseTicks  = Math.max(1, Math.ceil(periodTicks * 0.2))
+      if (tick % periodTicks < pauseTicks) {
+        rpsMult      = 0
+        utilFloor    = 1.0
+        latencyAddMs += intervalMs
+      }
+      continue
+    }
+
+    // Payload explosion — same request rate, but each request costs N× to
+    // process, so utilisation and downstream strain amplify by the multiplier.
+    if (id === 'TRAFFIC_PAYLOAD_EXPLOSION') {
+      rpsMult      = Math.max(rpsMult, mul)
+      latencyAddMs += 30
+      continue
+    }
+
+    // Cache persistence failure — cache restarts cold: every request misses
+    // and falls through to the backing store, with warm-up latency on top.
+    if (id === 'DATA_CACHE_PERSISTENCE') {
+      hitRateOverride = 0
+      latencyAddMs    += 300
+      continue
+    }
   }
 
-  return { rpsMult, failureRate, utilFloor, latencyAddMs }
+  return { rpsMult, failureRate, utilFloor, latencyAddMs, hitRateOverride }
 }
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -269,13 +302,15 @@ export function computeNodeFlow(
     }
 
     case NodeType.Cache: {
-      const cfg  = node.config as CacheConfig
-      return applyChaos({ outRps: effectiveRps * (1 - cfg.hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
+      const cfg     = node.config as CacheConfig
+      const hitRate = chaos.hitRateOverride >= 0 ? chaos.hitRateOverride : cfg.hitRate
+      return applyChaos({ outRps: effectiveRps * (1 - hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
     }
 
     case NodeType.CDN: {
-      const cfg  = node.config as CDNConfig
-      return applyChaos({ outRps: effectiveRps * (1 - cfg.hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
+      const cfg     = node.config as CDNConfig
+      const hitRate = chaos.hitRateOverride >= 0 ? chaos.hitRateOverride : cfg.hitRate
+      return applyChaos({ outRps: effectiveRps * (1 - hitRate), utilisationPct: (effectiveRps / cfg.capacity) * 100, errorRate: 0, queueDepth: 0 })
     }
 
     case NodeType.Database: {

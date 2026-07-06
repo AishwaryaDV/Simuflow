@@ -275,6 +275,7 @@ const CanvasPanel = observer(() => {
       e.preventDefault()
       const simType    = e.dataTransfer.getData('application/simuflow-node-type') as NodeType
       const structType = e.dataTransfer.getData('application/simuflow-structural-type') as StructuralNodeType
+      const chaosId    = e.dataTransfer.getData('application/simuflow-chaos-id')
 
       const raw = screenToFlowPosition({ x: e.clientX, y: e.clientY })
       const position = {
@@ -286,10 +287,63 @@ const CanvasPanel = observer(() => {
         runInAction(() => graphStore.addNode(createDefaultNode(simType, position)))
       } else if (structType && STRUCT_TYPES.has(structType)) {
         runInAction(() => graphStore.addStructuralNode(createDefaultStructuralNode(structType, position)))
+      } else if (chaosId) {
+        handleChaosDrop(chaosId, raw, e.clientX, e.clientY)
       }
     },
     [screenToFlowPosition],
   )
+
+  // Dropping a chaos card from the library targets the node under the cursor
+  // and opens the inject menu with that scenario pre-selected.
+  const handleChaosDrop = (chaosId: string, flowPos: { x: number; y: number }, clientX: number, clientY: number) => {
+    const isRunning = simulationStore.status === SimulationStatus.Running ||
+                      simulationStore.status === SimulationStatus.Chaos
+    if (!isRunning) return // ChaosCard's dragend already shows the "start simulation" toast
+
+    const scenario = chaosStore.availableScenarios.find(s => s.id === chaosId)
+    if (!scenario) return
+    if (scenario.targetKind === 'edge') {
+      runInAction(() => uiStore.showToast('Right-click an edge to inject this scenario'))
+      return
+    }
+    if (scenario.targetKind === 'group') {
+      runInAction(() => uiStore.showToast('Right-click a container to inject this scenario'))
+      return
+    }
+
+    // Hit-test: nearest node whose 56px box (plus margin) contains the drop point
+    let hit: { id: string; nodeType: NodeType } | null = null
+    let bestDist = Infinity
+    for (const node of graphStore.nodes.values()) {
+      const cx = node.position.x + 28
+      const cy = node.position.y + 28
+      const dist = Math.hypot(flowPos.x - cx, flowPos.y - cy)
+      if (dist < 60 && dist < bestDist) {
+        bestDist = dist
+        hit = { id: node.id, nodeType: node.nodeType }
+      }
+    }
+    if (!hit) {
+      runInAction(() => uiStore.showToast('Drop the scenario onto a node to inject it'))
+      return
+    }
+    const validForNode = scenario.validTargetTypes.length === 0 ||
+      scenario.validTargetTypes.includes(hit.nodeType)
+    if (!validForNode) {
+      runInAction(() => uiStore.showToast(`${scenario.name} can't target this node type`))
+      return
+    }
+
+    setChaosMenu({
+      type: 'node',
+      targetId: hit.id,
+      nodeType: hit.nodeType,
+      x: clientX,
+      y: clientY,
+      initialScenarioId: scenario.id,
+    })
+  }
 
   const onMoveEnd = useCallback(
     (_: unknown, vp: { x: number; y: number; zoom: number }) => {

@@ -22,6 +22,8 @@ export interface ContextMenuTarget {
   nodeType?: NodeType
   x:        number
   y:        number
+  /** Pre-select this scenario (drag-to-inject) so its config form opens immediately. */
+  initialScenarioId?: ChaosScenarioId
 }
 
 // ── Category colours ──────────────────────────────────────────────────────────
@@ -196,7 +198,11 @@ interface Props {
 
 const ChaosContextMenu = observer(({ target, onClose }: Props) => {
   const menuRef = useRef<HTMLDivElement>(null)
-  const [selectedScenario, setSelectedScenario] = useState<ChaosScenarioDef | null>(null)
+  const [selectedScenario, setSelectedScenario] = useState<ChaosScenarioDef | null>(
+    target.initialScenarioId
+      ? SCENARIO_CATALOGUE.find(s => s.id === target.initialScenarioId) ?? null
+      : null,
+  )
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -212,9 +218,10 @@ const ChaosContextMenu = observer(({ target, onClose }: Props) => {
     }
   }, [onClose])
 
-  // Filter scenarios for this target
+  // Filter scenarios for this target — edges only get edge-targeted scenarios;
+  // node-targeted NET_* ones (LB failure, TLS cert…) would be silent no-ops here.
   const scenarios: ChaosScenarioDef[] = target.type === 'edge'
-    ? SCENARIO_CATALOGUE.filter(s => s.id.startsWith('NET_'))
+    ? SCENARIO_CATALOGUE.filter(s => s.targetKind === 'edge')
     : target.nodeType
       ? chaosStore.validScenariosForNodeType(target.nodeType)
       : []
