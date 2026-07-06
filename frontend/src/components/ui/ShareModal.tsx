@@ -19,17 +19,34 @@ const ShareModal = observer(({ open, onClose }: ShareModalProps) => {
 
   useEffect(() => {
     if (!open || !diagramStore.currentDiagramId) return
+    // Only CHECK share status on open — publishing needs an explicit click.
+    setShareUrl(null)
     setLoading(true)
     setError(null)
-    api.diagrams.share(diagramStore.currentDiagramId)
-      .then(res => {
-        // Build URL using current origin so it always matches the deployed frontend
-        const token = res.shareToken
-        setShareUrl(`${window.location.origin}/shared/${token}`)
+    api.diagrams.get(diagramStore.currentDiagramId)
+      .then(d => {
+        if (d.isPublic && d.shareToken) {
+          // Build URL using current origin so it always matches the deployed frontend
+          setShareUrl(`${window.location.origin}/shared/${d.shareToken}`)
+        }
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [open])
+
+  const handleCreateLink = async () => {
+    if (!diagramStore.currentDiagramId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.diagrams.share(diagramStore.currentDiagramId)
+      setShareUrl(`${window.location.origin}/shared/${res.shareToken}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create share link')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleCopy = () => {
     if (!shareUrl) return
@@ -43,9 +60,9 @@ const ShareModal = observer(({ open, onClose }: ShareModalProps) => {
     setRevoking(true)
     try {
       await api.diagrams.unshare(diagramStore.currentDiagramId)
-      onClose()
-    } catch (e: any) {
-      setError(e.message)
+      setShareUrl(null) // back to the "create link" view
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to revoke link')
     } finally {
       setRevoking(false)
     }
@@ -122,7 +139,22 @@ const ShareModal = observer(({ open, onClose }: ShareModalProps) => {
                 Make private (revoke link)
               </button>
             </>
-          ) : null}
+          ) : (
+            /* Not shared yet — publishing requires an explicit click */
+            <>
+              <p className="text-xs text-app-text-2 leading-relaxed">
+                Create a public link for this diagram. Anyone with the link will be
+                able to view and fork it — no sign-in required.
+              </p>
+              <button
+                onClick={handleCreateLink}
+                className="flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white transition-colors"
+              >
+                <Link2 size={13} />
+                Create share link
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -63,9 +63,10 @@ def test_get_shared_diagram_bad_token(anon_client):
 def test_fork_diagram(auth_client):
     client, mock_db = auth_client
     mock_db.execute.side_effect = [
-        make_result(data=[PUBLIC_DIAGRAM]),    # get shared diagram
-        make_result(data=[FORKED_DIAGRAM]),    # insert fork
-        make_result(data=[PUBLIC_DIAGRAM]),    # increment fork_count
+        make_result(data=[PUBLIC_DIAGRAM]),                       # get shared diagram
+        make_result(data=[FORKED_DIAGRAM]),                       # insert fork
+        make_result(data=[{"fork_count": 0}]),                    # CAS: read fork_count
+        make_result(data=[{**PUBLIC_DIAGRAM, "fork_count": 1}]),  # CAS: update succeeds
     ]
 
     res = client.post("/api/v1/shared/tok-abc123/fork")

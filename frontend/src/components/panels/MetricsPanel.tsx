@@ -105,7 +105,7 @@ const MetricsPanel = observer(() => {
   const over  = costStore.isOverBudget
 
   const fmtUsd = (v: number) =>
-    v < 0.01 ? `$${(v * 100).toFixed(3)}¢` : `$${v.toFixed(v < 10 ? 3 : 2)}`
+    v < 0.01 ? `${(v * 100).toFixed(3)}¢` : `$${v.toFixed(v < 10 ? 3 : 2)}`
 
   return (
     <div className="border-t border-app-border bg-app-surface shrink-0">

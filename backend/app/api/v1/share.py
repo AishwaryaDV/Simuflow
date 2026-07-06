@@ -9,7 +9,7 @@ router = APIRouter(tags=["share"])
 # ── Share management (owner only) ─────────────────────────────────────────────
 
 @router.post("/api/v1/diagrams/{diagram_id}/share", response_model=ShareResponse)
-async def generate_share(
+def generate_share(
     diagram_id: str,
     user: RequiredUser,
     db: SupabaseClient,
@@ -18,7 +18,7 @@ async def generate_share(
 
 
 @router.delete("/api/v1/diagrams/{diagram_id}/share", status_code=204)
-async def revoke_share(
+def revoke_share(
     diagram_id: str,
     user: RequiredUser,
     db: SupabaseClient,
@@ -29,7 +29,7 @@ async def revoke_share(
 # ── Public shared diagram (no auth) ───────────────────────────────────────────
 
 @router.get("/api/v1/shared/{token}", response_model=DiagramResponse)
-async def get_shared_diagram(
+def get_shared_diagram(
     token: str,
     db: SupabaseClient,
 ):
@@ -39,7 +39,7 @@ async def get_shared_diagram(
 # ── Fork (requires auth) ───────────────────────────────────────────────────────
 
 @router.post("/api/v1/shared/{token}/fork", response_model=ForkResponse, status_code=201)
-async def fork_diagram(
+def fork_diagram(
     token: str,
     user: RequiredUser,
     db: SupabaseClient,

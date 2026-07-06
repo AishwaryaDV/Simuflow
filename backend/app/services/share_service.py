@@ -89,10 +89,27 @@ def fork_diagram(token: str, user_id: str, db: Client) -> ForkResponse:
     if not new_row.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Fork failed")
 
-    # Increment fork_count on the original
-    db.table("diagrams").update({
-        "fork_count": source["fork_count"] + 1,
-    }).eq("id", source["id"]).execute()
+    # Increment fork_count on the original — optimistic compare-and-set so
+    # concurrent forks don't overwrite each other's increment
+    for _ in range(3):
+        current = (
+            db.table("diagrams")
+            .select("fork_count")
+            .eq("id", source["id"])
+            .execute()
+        )
+        if not current.data:
+            break
+        count = current.data[0]["fork_count"]
+        updated = (
+            db.table("diagrams")
+            .update({"fork_count": count + 1})
+            .eq("id", source["id"])
+            .eq("fork_count", count)
+            .execute()
+        )
+        if updated.data:
+            break
 
     return ForkResponse(
         diagram_id=new_row.data[0]["id"],

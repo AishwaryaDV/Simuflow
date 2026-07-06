@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +10,19 @@ from app.api.v1.presets import router as presets_router
 from app.services import preset_service
 from app.db.client import get_supabase_client
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    preset_service.load_presets(get_supabase_client())
+    # A transient Supabase outage at boot must not take the whole API down —
+    # presets just come up empty until the next restart.
+    try:
+        preset_service.load_presets(get_supabase_client())
+        if not preset_service.list_presets():
+            logger.warning("No active presets loaded — is the presets migration applied?")
+    except Exception:
+        logger.exception("Failed to load presets at startup; /api/v1/presets will be empty")
     yield
     # Shutdown: cleanup if needed
 

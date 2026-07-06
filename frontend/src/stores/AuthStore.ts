@@ -8,6 +8,8 @@ class AuthStore {
   loading                 = true
   modalOpen               = false
   resetPasswordMode       = false
+  /** Action queued by requireAuth — runs automatically after a successful sign-in. */
+  private _pendingAction: (() => void) | null = null
 
   constructor() {
     makeObservable(this, {
@@ -39,6 +41,12 @@ class AuthStore {
           this.modalOpen = false
         }
       })
+      // Resume the action that triggered the auth gate (Save / Share / Fork)
+      if (_event === 'SIGNED_IN' && this._pendingAction) {
+        const action = this._pendingAction
+        this._pendingAction = null
+        setTimeout(action, 0)
+      }
     })
   }
 
@@ -57,13 +65,16 @@ class AuthStore {
 
   closeModal() {
     this.modalOpen = false
+    this._pendingAction = null // user dismissed — drop the queued action
   }
 
-  // Call this from Save/Share/etc to gate behind auth
+  // Call this from Save/Share/etc to gate behind auth.
+  // If the user signs in from the modal, the callback runs automatically.
   requireAuth(callback: () => void) {
     if (this.isAuthenticated) {
       callback()
     } else {
+      this._pendingAction = callback
       this.openModal()
     }
   }
@@ -97,7 +108,9 @@ class AuthStore {
   async signInWithGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options:  { redirectTo: window.location.origin },
+      // Keep the current page (e.g. /shared/:token) — origin alone would
+      // dump the user back at the workspace after the OAuth round-trip.
+      options:  { redirectTo: window.location.origin + window.location.pathname },
     })
   }
 
