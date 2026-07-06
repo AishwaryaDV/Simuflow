@@ -4,9 +4,10 @@
  * Cost model:
  *   totalRatePerHr = Σ nodes ( baseHrCost[nodeType] + rps/1M × perMillionReqCost[nodeType] )
  *
- * Spend accumulates per simulation tick using simulated time
- * (TICK_SECS × speed), so 4× speed = 4× faster cost accumulation,
- * matching "if this system ran for X simulated hours, it would cost $Y".
+ * Spend accumulates per simulation tick. Each tick is a fixed 0.2 simulated
+ * seconds and ticks fire `speed ×` faster in real time, so 4× speed = 4×
+ * faster cost accumulation — matching "if this system ran for X simulated
+ * hours, it would cost $Y".
  */
 
 import { makeObservable, observable, computed, action, reaction } from "mobx";
@@ -16,8 +17,8 @@ import { graphStore } from "./GraphStore";
 
 // ── Cloud pricing tables ───────────────────────────────────────────────────────
 
-/** Approximate $/hr to keep this node running (infra cost). */
-const BASE_HR: Partial<Record<NodeType, number>> = {
+/** Approximate $/hr to keep this node running (infra cost). AWS-based static table. */
+export const BASE_HR: Partial<Record<NodeType, number>> = {
   [NodeType.Client]: 0,
   [NodeType.LoadBalancer]: 0.025, // AWS ALB base
   [NodeType.ApiServer]: 0.042, // t3.medium EC2
@@ -59,7 +60,7 @@ const PER_MILLION_REQ: Partial<Record<NodeType, number>> = {
   [NodeType.LLMGateway]: 30.0, // ~$0.03/1k tokens → rough req equiv
 };
 
-// Tick interval in real seconds (matches simulation.worker.ts TICK_MS)
+// Simulated seconds per tick (matches simulation.worker.ts TICK_SECS)
 const TICK_REAL_SECS = 0.2;
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -152,8 +153,9 @@ class CostStore {
     )
       return;
     this._lastTick = tick;
-    // Simulated hours elapsed this tick
-    const simHrs = (TICK_REAL_SECS * simulationStore.speed) / 3600;
+    // Simulated hours elapsed this tick (speed is already reflected in the
+    // tick rate — applying it here too would compound to speed²)
+    const simHrs = TICK_REAL_SECS / 3600;
     this.spentUsd += this.currentRatePerHr * simHrs;
   }
 

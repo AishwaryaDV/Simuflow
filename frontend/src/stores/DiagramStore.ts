@@ -1,7 +1,8 @@
 import { makeObservable, observable, action, runInAction } from 'mobx'
 import { api, type DiagramSummary } from '../lib/api'
 import { graphStore } from './GraphStore'
-import { TOPOLOGY_VERSION, type TopologySchema } from '../types/topology'
+import { simulationStore } from './SimulationStore'
+import { SimulationStatus, TOPOLOGY_VERSION, type TopologySchema } from '../types/topology'
 
 class DiagramStore {
   currentDiagramId: string | null = null
@@ -70,6 +71,7 @@ class DiagramStore {
   async loadDiagram(id: string): Promise<void> {
     const diagram = await api.diagrams.get(id)
     runInAction(() => {
+      if (simulationStore.status !== SimulationStatus.Idle) simulationStore.stop()
       graphStore.loadTopology(diagram.topology as TopologySchema, undefined, diagram.name)
       this.currentDiagramId = diagram.id
       this.listOpen = false
@@ -80,7 +82,11 @@ class DiagramStore {
     await api.diagrams.delete(id)
     runInAction(() => {
       this.diagrams = this.diagrams.filter(d => d.id !== id)
-      if (this.currentDiagramId === id) this.currentDiagramId = null
+      if (this.currentDiagramId === id) {
+        // The open diagram no longer exists — clear the canvas too
+        this.currentDiagramId = null
+        graphStore.clearCanvas()
+      }
     })
   }
 

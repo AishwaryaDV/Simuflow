@@ -23,8 +23,11 @@ import { emitEdgeFlows } from './particleEmitter'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TICK_MS   = 200   // real-time interval between frames
-const TICK_SECS = 0.2   // each tick = 0.2 simulated seconds at speed=1
+// Speed semantics: one tick is ALWAYS 0.2 simulated seconds. Speed only
+// changes how often ticks fire in real time (TICK_MS / speed), so simulated
+// time advances at exactly `speed ×` real time — never speed².
+const TICK_MS   = 200   // real-time interval between frames at speed=1
+const TICK_SECS = 0.2   // simulated seconds per tick (speed-independent)
 
 // ── Worker state ──────────────────────────────────────────────────────────────
 
@@ -33,6 +36,7 @@ let speed       = 1
 let status:     SimulationStatus = SimulationStatus.Idle
 let intervalId: ReturnType<typeof setInterval> | null = null
 let tickId      = 0
+let cumulativeRequests = 0
 
 const solverState   = new SolverState()
 const workerChaos   = new Map<string, ActiveScenario>()
@@ -48,6 +52,7 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
       status   = SimulationStatus.Running
       solverState.reset()
       tickId = 0
+      cumulativeRequests = 0
       startLoop()
       post({ type: 'READY' })
       break
@@ -68,6 +73,7 @@ self.onmessage = (e: MessageEvent<WorkerInboundMessage>) => {
       topology = null
       solverState.reset()
       workerChaos.clear()
+      cumulativeRequests = 0
       break
 
     case 'SET_SPEED':
@@ -183,7 +189,7 @@ function applyEdgeChaos(edgeId: string, rps: number, tick: number): number {
 function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
   const { nodes, edges } = topo
   const simNodes = nodes.filter(n => n.nodeType !== undefined)
-  const tickSecs = TICK_SECS * speed
+  const tickSecs = TICK_SECS
 
   const edgeMap = new Map(edges.map(e => [e.id, e]))
 
@@ -198,7 +204,7 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     if (n.nodeType === NodeType.Client) {
       const cfg   = n.config as ClientConfig
       const burst = cfg.burst && (tick % 30 < 5) ? 3 : 1
-      outflow.set(n.id, cfg.rps * burst * speed)
+      outflow.set(n.id, cfg.rps * burst)
     } else {
       outflow.set(n.id, 0)
     }
@@ -222,7 +228,7 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
 
     const outs      = outEdges.get(node.id) ?? []
     const inEdgeIds = (inEdges.get(node.id) ?? []).map(e => e.edgeId)
-    const chaosModifier = buildChaosModifier(node.id, inEdgeIds, workerChaos)
+    const chaosModifier = buildChaosModifier(node.id, inEdgeIds, workerChaos, tick)
     const flow = computeNodeFlow(node, effectiveIncoming, solverState, tick, tickSecs, chaosModifier)
 
     // Weighted distribution with bandwidth cap + edge chaos
@@ -253,7 +259,8 @@ function computeFrame(topo: TopologySchema, tick: number): SimulationFrame {
     }
   }
 
-  const globalMetrics = aggregateMetrics(simNodes, nodeStates, outflow, tick, speed)
+  const globalMetrics = aggregateMetrics(simNodes, nodeStates, outflow, cumulativeRequests)
+  cumulativeRequests  = globalMetrics.totalRequests
   const edgeFlows     = emitEdgeFlows(edges, edgeRps, nodeStates, partitionedEdgeIds)
   const bottlenecks   = Object.values(nodeStates)
     .filter(s => s.utilisationPct > 90)

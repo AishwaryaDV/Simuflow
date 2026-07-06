@@ -4,9 +4,11 @@
  * Mount this once in WorkspaceLayout.
  */
 import { useEffect, useRef } from 'react'
-import { runInAction } from 'mobx'
+import { reaction, runInAction } from 'mobx'
 import { simulationStore } from '../stores/SimulationStore'
 import { graphStore } from '../stores/GraphStore'
+import { uiStore } from '../stores/UIStore'
+import { SimulationStatus } from '../types/topology'
 import type { WorkerOutboundMessage } from '../types/topology'
 
 export function useWorkerBridge() {
@@ -25,11 +27,19 @@ export function useWorkerBridge() {
         runInAction(() => simulationStore.absorbFrame(msg.frame))
       } else if (msg.type === 'ERROR') {
         console.error('[SimWorker]', msg.message)
+        runInAction(() => {
+          simulationStore.stop()
+          uiStore.showToast('Simulation stopped — an internal error occurred.')
+        })
       }
     }
 
     worker.onerror = (err) => {
       console.error('[SimWorker] uncaught error', err)
+      runInAction(() => {
+        simulationStore.stop()
+        uiStore.showToast('Simulation stopped — an internal error occurred.')
+      })
     }
 
     // Expose controls on simulationStore
@@ -46,7 +56,20 @@ export function useWorkerBridge() {
       deactivateChaos:(instanceId) => worker.postMessage({ type: 'DEACTIVATE_CHAOS', instanceId }),
     }
 
+    // Push topology edits to the worker while a simulation is active, so
+    // config changes (hit rate, capacity, RPS…) take effect live.
+    const disposeTopologySync = reaction(
+      () => simulationStore.status !== SimulationStatus.Idle
+        ? JSON.stringify(graphStore.topology)
+        : null,
+      (json, prevJson) => {
+        if (json === null || prevJson === undefined || prevJson === null) return
+        worker.postMessage({ type: 'UPDATE_TOPOLOGY', topology: JSON.parse(json) })
+      },
+    )
+
     return () => {
+      disposeTopologySync()
       worker.postMessage({ type: 'STOP' })
       worker.terminate()
       workerRef.current = null

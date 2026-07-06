@@ -19,8 +19,8 @@ export function aggregateMetrics(
   simNodes:    SimNode[],
   nodeStates:  Record<string, NodeRuntimeState>,
   outflow:     Map<string, number>,
-  tick:        number,
-  speed:       number,
+  /** Running total from previous ticks — this tick's requests are added on top. */
+  prevTotalRequests: number,
 ): MetricSnapshot {
   const allStates = Object.values(nodeStates)
 
@@ -63,6 +63,6 @@ export function aggregateMetrics(
     p95LatencyMs:  Math.round(p95),
     p99LatencyMs:  Math.round(p99),
     errorRate:     avgErr,
-    totalRequests: tick * totalRps * TICK_SECS * speed,
+    totalRequests: prevTotalRequests + totalRps * TICK_SECS,
   }
 }

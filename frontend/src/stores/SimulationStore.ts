@@ -149,6 +149,13 @@ class SimulationStore {
     for (const [id, flow] of Object.entries(frame.edgeFlows)) {
       this.edgeFlows.set(id, flow)
     }
+    // Drop state for nodes/edges removed from the topology mid-run
+    for (const id of this.nodeStates.keys()) {
+      if (!(id in frame.nodeStates)) this.nodeStates.delete(id)
+    }
+    for (const id of this.edgeFlows.keys()) {
+      if (!(id in frame.edgeFlows)) this.edgeFlows.delete(id)
+    }
 
     this.globalMetrics = frame.globalMetrics
 
@@ -175,7 +182,9 @@ class SimulationStore {
   }
 
   _tickElapsed() {
-    this.elapsedSeconds += 1
+    // Simulated seconds — advances speed× faster than the wall clock,
+    // consistent with cost accrual and totalRequests.
+    this.elapsedSeconds += this.speed
   }
 }
 

@@ -507,6 +507,17 @@ class ChaosStore {
         }
       }),
     )
+
+    // The worker drops all chaos state on STOP — mirror that here so a
+    // later restart doesn't show active pills the engine no longer applies.
+    reaction(
+      () => simulationStore.status,
+      (status) => {
+        if (status === SimulationStatus.Idle && this.isChaosModeActive) {
+          runInAction(() => this.clearAll())
+        }
+      },
+    )
   }
 
   // ─── Computed ──────────────────────────────────────────────────────────────
