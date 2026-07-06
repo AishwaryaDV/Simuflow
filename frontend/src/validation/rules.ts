@@ -59,8 +59,8 @@ function reachableFromClients(ctx: ValidationContext): Set<string> {
   return visited
 }
 
-/** Detects cycles via DFS. Returns true if a cycle exists. */
-function hasCycle(ctx: ValidationContext): boolean {
+/** Detects cycles via DFS. Returns the IDs of nodes that sit on at least one cycle. */
+function cycleNodes(ctx: ValidationContext): Set<string> {
   const adjacency = new Map<string, string[]>()
   ctx.edges.forEach(e => {
     if (!adjacency.has(e.sourceId)) adjacency.set(e.sourceId, [])
@@ -71,20 +71,28 @@ function hasCycle(ctx: ValidationContext): boolean {
   const color = new Map<string, number>()
   ctx.nodes.forEach((_, id) => color.set(id, WHITE))
 
-  function dfs(id: string): boolean {
+  const onCycle = new Set<string>()
+  const stack: string[] = []
+
+  function dfs(id: string): void {
     color.set(id, GRAY)
+    stack.push(id)
     for (const next of (adjacency.get(id) ?? [])) {
-      if (color.get(next) === GRAY) return true
-      if (color.get(next) === WHITE && dfs(next)) return true
+      if (color.get(next) === GRAY) {
+        // Back edge — everything on the stack from `next` onward is on the cycle
+        for (let i = stack.indexOf(next); i >= 0 && i < stack.length; i++) onCycle.add(stack[i])
+      } else if (color.get(next) === WHITE) {
+        dfs(next)
+      }
     }
+    stack.pop()
     color.set(id, BLACK)
-    return false
   }
 
   for (const id of ctx.nodes.keys()) {
-    if (color.get(id) === WHITE && dfs(id)) return true
+    if (color.get(id) === WHITE) dfs(id)
   }
-  return false
+  return onCycle
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,22 +163,6 @@ const ERROR_RULES: ValidationRule[] = [
   },
 
   {
-    id:       'ERR_CYCLE',
-    severity: 'error',
-    title:    'Circular flow detected',
-    check(ctx) {
-      if (!hasCycle(ctx)) return []
-      return [{
-        ruleId:          'ERR_CYCLE',
-        severity:        'error',
-        title:           'Circular flow detected',
-        message:         'The topology contains a cycle (A → B → … → A). RPS amplifies with each loop pass and the simulation diverges.',
-        affectedNodeIds: [],
-      }]
-    },
-  },
-
-  {
     id:       'ERR_ISOLATED_NODE',
     severity: 'error',
     title:    'Node has no edges',
@@ -223,6 +215,23 @@ const ERROR_RULES: ValidationRule[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 const WARNING_RULES: ValidationRule[] = [
+
+  {
+    id:       'WARN_CYCLE',
+    severity: 'warning',
+    title:    'Circular flow detected',
+    check(ctx) {
+      const onCycle = cycleNodes(ctx)
+      if (onCycle.size === 0) return []
+      return [{
+        ruleId:          'WARN_CYCLE',
+        severity:        'warning',
+        title:           'Circular flow detected',
+        message:         'The topology contains a feedback loop (A → B → … → A). Feedback edges do not carry traffic in the simulation, so downstream load may be understated.',
+        affectedNodeIds: [...onCycle],
+      }]
+    },
+  },
 
   {
     id:       'WARN_CLIENT_NO_OUTGOING',

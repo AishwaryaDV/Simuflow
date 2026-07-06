@@ -179,6 +179,7 @@ class GraphStore {
     for (const sn of topology.structuralNodes ?? []) this.structuralNodes.set(sn.id, sn)
     this.viewport       = topology.viewport
     this.selectedNodeId = null
+    this.selectedEdgeId = null
     this.diagramId      = id ?? null
     this.diagramName    = name ?? 'Untitled Diagram'
     this.isDirty        = false
@@ -190,7 +191,9 @@ class GraphStore {
     this.edges.clear()
     this.structuralNodes.clear()
     this.selectedNodeId = null
+    this.selectedEdgeId = null
     this.diagramId      = null
+    this.diagramName    = 'Untitled Diagram'
     this.isDirty        = false
     this.loadKey        += 1
   }

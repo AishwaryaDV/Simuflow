@@ -11,6 +11,7 @@ import MetricsPanel from '../panels/MetricsPanel'
 import TemplatesSidebar from '../panels/TemplatesSidebar'
 import TemplateBadge from '../canvas/TemplateBadge'
 import ConfirmDialog from '../ui/ConfirmDialog'
+import ErrorBoundary from '../ui/ErrorBoundary'
 import ValidationErrorModal from '../ui/ValidationErrorModal'
 import ValidationWarningSheet from '../ui/ValidationWarningSheet'
 import Toast from '../ui/Toast'
@@ -61,10 +62,12 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
           <NodeLibrary />
           <div className="flex flex-col flex-1 overflow-hidden">
             <main className="flex-1 overflow-hidden relative">
-              <CanvasPanel />
-              <EdgeConfigPanel />
-              {uiStore.templateMode && <TemplateBadge />}
-              <SimulationHUD />
+              <ErrorBoundary label="canvas">
+                <CanvasPanel />
+                <EdgeConfigPanel />
+                {uiStore.templateMode && <TemplateBadge />}
+                <SimulationHUD />
+              </ErrorBoundary>
             </main>
             <MetricsPanel />
           </div>

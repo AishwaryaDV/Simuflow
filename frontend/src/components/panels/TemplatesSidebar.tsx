@@ -3,12 +3,13 @@ import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import {
   X, Lightbulb, Lock, Trash2, ChevronLeft, Loader2, LayoutTemplate,
-  Globe, Zap, Link2, Users, Film, Navigation2, BarChart3, Bot,
-  LayoutGrid, ArrowRight,
+  Globe, Zap, Link2, Users, Film, Navigation2, Bot,
+  LayoutGrid, ArrowRight, Boxes, ListOrdered,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
 import { simulationStore } from '../../stores/SimulationStore'
+import { diagramStore } from '../../stores/DiagramStore'
 import { uiStore } from '../../stores/UIStore'
 import { SimulationStatus } from '../../types/topology'
 import {
@@ -26,11 +27,12 @@ const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   blank:          LayoutGrid,
   web_app:        Globe,
   cached_web_app: Zap,
+  microservices:  Boxes,
+  queue_system:   ListOrdered,
   url_shortener:  Link2,
   social_feed:    Users,
   video_streaming:Film,
   ride_sharing:   Navigation2,
-  data_analytics: BarChart3,
   ai_agent:       Bot,
 }
 
@@ -202,10 +204,12 @@ const TemplatesSidebar = observer(() => {
 
         if (template.slug === 'blank') {
           graphStore.clearCanvas()
-          graphStore.setName('Untitled Diagram')
         } else if (template.topology) {
           graphStore.loadTopology(template.topology, undefined, template.name)
         }
+        // The canvas no longer holds the previously open diagram — a later
+        // Save must create a new record, not overwrite the old one.
+        diagramStore.setCurrentId(null)
       })
 
       setLoadingSlug(null)
@@ -250,6 +254,7 @@ const TemplatesSidebar = observer(() => {
         runInAction(() => {
           if (isSimRunning) simulationStore.stop()
           graphStore.clearCanvas()
+          diagramStore.setCurrentId(null)
           uiStore.setLoadedTemplate(null)
         })
       },

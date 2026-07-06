@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
@@ -14,6 +14,15 @@ import ShareModal from '../ui/ShareModal'
 const UserButton = observer(() => {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
 
   if (!authStore.isAuthenticated) {
     return (
@@ -64,7 +73,7 @@ const SPEEDS: { label: string; value: 0.25 | 0.5 | 1 | 2 | 4 }[] = [
 
 function formatElapsed(secs: number): string {
   const m = Math.floor(secs / 60).toString().padStart(2, '0')
-  const s = (secs % 60).toString().padStart(2, '0')
+  const s = Math.floor(secs % 60).toString().padStart(2, '0')
   return `${m}:${s}`
 }
 
@@ -88,6 +97,7 @@ const Toolbar = observer(() => {
         runInAction(() => {
           if (!isIdle) simulationStore.stop()
           graphStore.clearCanvas()
+          diagramStore.setCurrentId(null)
           uiStore.setLoadedTemplate(null)
           validationStore.reset()
         })

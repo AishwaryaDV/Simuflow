@@ -32,10 +32,18 @@ const DiagramsModal = observer(() => {
 
   if (!diagramStore.listOpen) return null
 
-  const handleDelete = async (id: string) => {
-    setDeletingId(id)
-    try { await diagramStore.deleteDiagram(id) }
-    finally { setDeletingId(null) }
+  const handleDelete = (id: string, name: string) => {
+    uiStore.openConfirm(
+      'Delete diagram',
+      `"${name}" will be permanently deleted. This cannot be undone.`,
+      async () => {
+        setDeletingId(id)
+        try { await diagramStore.deleteDiagram(id) }
+        catch { uiStore.showToast('Failed to delete diagram. Please try again.') }
+        finally { setDeletingId(null) }
+      },
+      true,
+    )
   }
 
   return (
@@ -102,6 +110,7 @@ const DiagramsModal = observer(() => {
                         guardUnsaved(async () => {
                           setLoadingId(d.id)
                           try { await diagramStore.loadDiagram(d.id) }
+                          catch { uiStore.showToast('Failed to open diagram. Please try again.') }
                           finally { setLoadingId(null) }
                         })
                       }}
@@ -113,7 +122,7 @@ const DiagramsModal = observer(() => {
                         : 'Open'}
                     </button>
                     <button
-                      onClick={() => handleDelete(d.id)}
+                      onClick={() => handleDelete(d.id, d.name)}
                       disabled={deletingId === d.id}
                       className="p-1 rounded-md text-app-text-3 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
                     >
