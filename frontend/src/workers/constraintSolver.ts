@@ -80,11 +80,17 @@ export function buildChaosModifier(
       'INFRA_INSTANCE_CRASH', 'INFRA_DISK_FAILURE', 'INFRA_AZ_FAILURE', 'INFRA_DC_OUTAGE',
       'APP_OOM_CRASH', 'APP_DEADLOCK',
       'NET_LB_FAILURE', 'NET_TLS_CERT', 'NET_DNS_FAILURE', 'NET_NAT_FAILURE',
-      'NET_BLACKHOLE', 'DEP_THIRD_PARTY', 'DEP_AUTH_OUTAGE', 'DEP_SERVICE_DISCOVERY',
+      'DEP_THIRD_PARTY', 'DEP_AUTH_OUTAGE', 'DEP_SERVICE_DISCOVERY',
       'DATA_DB_PRIMARY_CRASH', 'DATA_CACHE_SENTINEL_SPLIT',
     ].includes(id)) {
       rpsMult     = 0
       failureRate = 1.0
+      continue
+    }
+
+    // Blackhole — silent drop, no error signal (traffic vanishes)
+    if (id === 'NET_BLACKHOLE') {
+      rpsMult = 0
       continue
     }
 
@@ -501,10 +507,12 @@ export function computeNodeFlow(
       const allowed = effectiveRps * (1 - cfg.blockRate)
       const util    = effectiveRps / Math.max(cfg.inspectionCapacity, 1)
       const failed  = failureRoll < cfg.failureRate
+      // Blocked traffic is intentional filtering, not an error — only real
+      // failures (fail-open pass-all) count toward global error rate.
       return applyChaos({
         outRps:         failed ? effectiveRps : allowed,
         utilisationPct: util * 100,
-        errorRate:      cfg.blockRate,
+        errorRate:      failed ? cfg.failureRate : 0,
         queueDepth:     0,
       })
     }
