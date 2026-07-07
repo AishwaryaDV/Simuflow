@@ -64,6 +64,12 @@ const CanvasPanel = observer(() => {
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Undo/redo works even when an input is focused
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        runInAction(() => { e.shiftKey ? graphStore.redo() : graphStore.undo() })
+        return
+      }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const m = KEY_MODE_MAP[e.key.toLowerCase()]
       if (m) { runInAction(() => uiStore.setCanvasMode(m)); setPendingSource(null) }

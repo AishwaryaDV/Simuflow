@@ -3,6 +3,14 @@ import { nanoid } from 'nanoid'
 import type { SimNode, SimEdge, StructuralNode, TopologySchema, CanvasViewport } from '../types/topology'
 import { TOPOLOGY_VERSION } from '../types/topology'
 
+const MAX_UNDO = 50
+
+interface Snapshot {
+  nodes:           SimNode[]
+  edges:           SimEdge[]
+  structuralNodes: StructuralNode[]
+}
+
 class GraphStore {
   nodes:           Map<string, SimNode>        = new Map()
   edges:           Map<string, SimEdge>        = new Map()
@@ -14,6 +22,14 @@ class GraphStore {
   isDirty:         boolean       = false
   viewport:        CanvasViewport = { x: 0, y: 0, zoom: 1 }
   loadKey:         number         = 0
+
+  private _undoStack: Snapshot[] = []
+  private _redoStack: Snapshot[] = []
+  private _skipSnapshot = false
+  private _lastPushTime = 0
+  private _batchBase: Snapshot | null = null
+  canUndo = false
+  canRedo = false
 
   constructor() {
     makeObservable(this, {
@@ -27,6 +43,8 @@ class GraphStore {
       isDirty:              observable,
       viewport:             observable,
       loadKey:              observable,
+      canUndo:              observable,
+      canRedo:              observable,
       nodeCount:            computed,
       edgeCount:            computed,
       sourceNodes:          computed,
@@ -48,7 +66,83 @@ class GraphStore {
       loadTopology:         action,
       clearCanvas:          action,
       markSaved:            action,
+      pushSnapshot:         action,
+      undo:                 action,
+      redo:                 action,
     })
+  }
+
+  // ─── Undo / Redo ──────────────────────────────────────────────────────────
+
+  private _snap(): Snapshot {
+    return {
+      nodes:           Array.from(this.nodes.values()).map(n => ({ ...n, config: { ...n.config }, position: { ...n.position } })),
+      edges:           Array.from(this.edges.values()).map(e => ({ ...e })),
+      structuralNodes: Array.from(this.structuralNodes.values()).map(s => ({ ...s, position: { ...s.position } })),
+    }
+  }
+
+  private _restore(snap: Snapshot) {
+    this._skipSnapshot = true
+    this.nodes.clear()
+    this.edges.clear()
+    this.structuralNodes.clear()
+    for (const n of snap.nodes) this.nodes.set(n.id, n)
+    for (const e of snap.edges) this.edges.set(e.id, e)
+    for (const s of snap.structuralNodes) this.structuralNodes.set(s.id, s)
+    if (this.selectedNodeId && !this.nodes.has(this.selectedNodeId) && !this.structuralNodes.has(this.selectedNodeId)) {
+      this.selectedNodeId = null
+    }
+    if (this.selectedEdgeId && !this.edges.has(this.selectedEdgeId)) {
+      this.selectedEdgeId = null
+    }
+    this.isDirty = true
+    this._skipSnapshot = false
+  }
+
+  private _syncFlags() {
+    this.canUndo = this._undoStack.length > 0
+    this.canRedo = this._redoStack.length > 0
+  }
+
+  pushSnapshot() {
+    if (this._skipSnapshot) return
+    const now = Date.now()
+    const BATCH_MS = 300
+    if (now - this._lastPushTime < BATCH_MS && this._batchBase) {
+      // Rapid successive mutations (e.g. slider drag, typing) — keep the
+      // original pre-edit state on the stack instead of one entry per keystroke.
+      this._undoStack[this._undoStack.length - 1] = this._batchBase
+    } else {
+      this._batchBase = this._snap()
+      this._undoStack.push(this._batchBase)
+      if (this._undoStack.length > MAX_UNDO) this._undoStack.shift()
+    }
+    this._lastPushTime = now
+    this._redoStack.length = 0
+    this._syncFlags()
+  }
+
+  undo() {
+    const prev = this._undoStack.pop()
+    if (!prev) return
+    this._redoStack.push(this._snap())
+    this._restore(prev)
+    this._syncFlags()
+  }
+
+  redo() {
+    const next = this._redoStack.pop()
+    if (!next) return
+    this._undoStack.push(this._snap())
+    this._restore(next)
+    this._syncFlags()
+  }
+
+  resetHistory() {
+    this._undoStack.length = 0
+    this._redoStack.length = 0
+    this._syncFlags()
   }
 
   // ─── Computed ──────────────────────────────────────────────────────────────
@@ -84,6 +178,7 @@ class GraphStore {
   // ─── Simulation node actions ───────────────────────────────────────────────
 
   addNode(node: Omit<SimNode, 'id'> & { id?: string }): string {
+    this.pushSnapshot()
     const id = node.id ?? nanoid()
     this.nodes.set(id, { ...node, id } as SimNode)
     this.isDirty = true
@@ -91,6 +186,7 @@ class GraphStore {
   }
 
   removeNode(id: string) {
+    this.pushSnapshot()
     this.nodes.delete(id)
     for (const [edgeId, edge] of this.edges) {
       if (edge.sourceId === id || edge.targetId === id) this.edges.delete(edgeId)
@@ -102,11 +198,13 @@ class GraphStore {
   updateNodeConfig(id: string, patch: Partial<SimNode>) {
     const node = this.nodes.get(id)
     if (!node) return
+    this.pushSnapshot()
     this.nodes.set(id, { ...node, ...patch } as SimNode)
     this.isDirty = true
   }
 
   connectNodes(sourceId: string, targetId: string, label?: string): string {
+    this.pushSnapshot()
     const id = nanoid()
     this.edges.set(id, { id, sourceId, targetId, label })
     this.isDirty = true
@@ -114,6 +212,7 @@ class GraphStore {
   }
 
   disconnectEdge(id: string) {
+    this.pushSnapshot()
     this.edges.delete(id)
     if (this.selectedEdgeId === id) this.selectedEdgeId = null
     this.isDirty = true
@@ -122,6 +221,7 @@ class GraphStore {
   updateEdge(id: string, patch: Partial<SimEdge>) {
     const edge = this.edges.get(id)
     if (!edge) return
+    this.pushSnapshot()
     this.edges.set(id, { ...edge, ...patch })
     this.isDirty = true
   }
@@ -129,6 +229,7 @@ class GraphStore {
   // ─── Structural node actions ───────────────────────────────────────────────
 
   addStructuralNode(node: Omit<StructuralNode, 'id'> & { id?: string }): string {
+    this.pushSnapshot()
     const id = node.id ?? nanoid()
     this.structuralNodes.set(id, { ...node, id } as StructuralNode)
     this.isDirty = true
@@ -136,6 +237,7 @@ class GraphStore {
   }
 
   removeStructuralNode(id: string) {
+    this.pushSnapshot()
     this.structuralNodes.delete(id)
     if (this.selectedNodeId === id) this.selectedNodeId = null
     this.isDirty = true
@@ -144,6 +246,7 @@ class GraphStore {
   updateStructuralNode(id: string, patch: Partial<StructuralNode>) {
     const node = this.structuralNodes.get(id)
     if (!node) return
+    this.pushSnapshot()
     this.structuralNodes.set(id, { ...node, ...patch })
     this.isDirty = true
   }
@@ -184,6 +287,7 @@ class GraphStore {
     this.diagramName    = name ?? 'Untitled Diagram'
     this.isDirty        = false
     this.loadKey        += 1
+    this.resetHistory()
   }
 
   clearCanvas() {
@@ -196,6 +300,7 @@ class GraphStore {
     this.diagramName    = 'Untitled Diagram'
     this.isDirty        = false
     this.loadKey        += 1
+    this.resetHistory()
   }
 
   markSaved(id: string) {

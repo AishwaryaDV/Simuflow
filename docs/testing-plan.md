@@ -35,9 +35,13 @@ Test feature by feature in this order. For each test: note pass/fail and any une
 | 2.8 | Delete a node that has edges | Edges are also removed |
 | 2.9 | Click an edge | Edge config panel opens |
 | 2.10 | Delete an edge | Only edge removed, nodes stay |
-| 2.11 | ~~Undo (Cmd/Ctrl+Z) after add~~ | Descoped for launch — no undo stack |
-| 2.12 | ~~Undo after delete~~ | Descoped for launch — no undo stack |
-| 2.13 | Pan and zoom canvas | Viewport moves/scales |
+| 2.11 | Undo (Cmd/Ctrl+Z) after add | Last added node removed, canvas reverts |
+| 2.12 | Undo after delete | Deleted node + its edges restored |
+| 2.13 | Redo (Cmd/Ctrl+Shift+Z) after undo | Node re-appears |
+| 2.14 | Undo after config change | Config value reverts to previous |
+| 2.15 | Rapid config edits (slider/typing) batch into one undo step | Single undo reverts the whole edit burst |
+| 2.16 | Load a template resets undo history | Cmd+Z does nothing after template load |
+| 2.17 | Pan and zoom canvas | Viewport moves/scales |
 
 ---
 

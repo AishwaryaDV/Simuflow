@@ -8,7 +8,7 @@ import { uiStore } from '../../stores/UIStore'
 import { authStore } from '../../stores/AuthStore'
 import { diagramStore } from '../../stores/DiagramStore'
 import { SimulationStatus } from '../../types/topology'
-import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2, Link2 } from 'lucide-react'
+import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2, Link2, Undo2, Redo2 } from 'lucide-react'
 import ShareModal from '../ui/ShareModal'
 
 const UserButton = observer(() => {
@@ -169,6 +169,26 @@ const Toolbar = observer(() => {
         }
         <span className="hidden sm:inline">{diagramStore.isSaving ? 'Saving…' : 'Save'}</span>
       </button>
+
+      {/* Undo / Redo */}
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => runInAction(() => graphStore.undo())}
+          disabled={!graphStore.canUndo}
+          className="p-1.5 rounded-lg text-app-text-2 hover:text-app-text hover:bg-app-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Undo (⌘Z)"
+        >
+          <Undo2 size={14} strokeWidth={1.8} />
+        </button>
+        <button
+          onClick={() => runInAction(() => graphStore.redo())}
+          disabled={!graphStore.canRedo}
+          className="p-1.5 rounded-lg text-app-text-2 hover:text-app-text hover:bg-app-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Redo (⌘⇧Z)"
+        >
+          <Redo2 size={14} strokeWidth={1.8} />
+        </button>
+      </div>
 
       <div className="flex-1" />
 
