@@ -76,9 +76,9 @@ class GraphStore {
 
   private _snap(): Snapshot {
     return {
-      nodes:           Array.from(this.nodes.values()).map(n => ({ ...n, config: { ...n.config }, position: { ...n.position } })),
+      nodes:           Array.from(this.nodes.values()).map(n => ({ ...n, config: { ...n.config }, position: { ...n.position } }) as SimNode),
       edges:           Array.from(this.edges.values()).map(e => ({ ...e })),
-      structuralNodes: Array.from(this.structuralNodes.values()).map(s => ({ ...s, position: { ...s.position } })),
+      structuralNodes: Array.from(this.structuralNodes.values()).map(s => ({ ...s, position: { ...s.position } }) as StructuralNode),
     }
   }
 
@@ -142,6 +142,8 @@ class GraphStore {
   resetHistory() {
     this._undoStack.length = 0
     this._redoStack.length = 0
+    this._batchBase = null
+    this._lastPushTime = 0
     this._syncFlags()
   }
 
