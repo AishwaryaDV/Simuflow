@@ -259,7 +259,7 @@ const Toolbar = observer(() => {
 
       <div className="w-px h-5 bg-app-border shrink-0" />
 
-      {/* Templates */}
+      {/* Presets */}
       <button
         onClick={() => runInAction(() => uiStore.showTemplatesList())}
         className={[
@@ -268,10 +268,10 @@ const Toolbar = observer(() => {
             ? 'border-app-accent/40 text-app-accent bg-app-accent/10'
             : 'border-app-border/40 text-app-text-2 hover:text-app-text',
         ].join(' ')}
-        title="Browse templates"
+        title="Browse presets"
       >
         <LayoutTemplate size={13} strokeWidth={1.8} />
-        <span className="hidden sm:inline">Templates</span>
+        <span className="hidden sm:inline">Presets</span>
       </button>
 
       {/* Reset */}

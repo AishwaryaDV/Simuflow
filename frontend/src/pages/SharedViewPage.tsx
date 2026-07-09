@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ReactFlow,
   ReactFlowProvider,
+  Controls,
   Background,
   MarkerType,
   useReactFlow,
@@ -53,10 +54,10 @@ function buildRFEdges(topology: TopologySchema): Edge[] {
 // ── Inner canvas (needs useReactFlow) ────────────────────────────────────────
 
 function SharedCanvas({ topology }: { topology: TopologySchema }) {
-  const { setViewport } = useReactFlow()
+  const { fitView } = useReactFlow()
 
   useEffect(() => {
-    if (topology.viewport) setViewport(topology.viewport, { duration: 0 })
+    setTimeout(() => fitView({ padding: 0.3, duration: 300 }), 100)
   }, [])
 
   return (
@@ -74,7 +75,10 @@ function SharedCanvas({ topology }: { topology: TopologySchema }) {
       maxZoom={2}
       deleteKeyCode={null}
       proOptions={{ hideAttribution: true }}
+      fitView
+      fitViewOptions={{ padding: 0.3 }}
     >
+      <Controls showInteractive={false} />
       <Background gap={20} color="#2a2a3d" variant={'dots' as any} />
     </ReactFlow>
   )

@@ -277,7 +277,7 @@ const TemplatesSidebar = observer(() => {
           {/* Header */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-app-border shrink-0">
             <LayoutTemplate size={14} className="text-app-accent shrink-0" />
-            <span className="text-xs font-semibold text-white flex-1">Templates</span>
+            <span className="text-xs font-semibold text-white flex-1">Presets</span>
             <button
               onClick={handleClose}
               className="p-1 rounded text-app-text-3 hover:text-app-text hover:bg-app-elevated transition-colors"

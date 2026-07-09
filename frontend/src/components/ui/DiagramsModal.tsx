@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { X, FolderOpen, Trash2, Plus, Loader2, FileText } from 'lucide-react'
+import { ArrowLeft, FolderOpen, Trash2, Plus, Loader2, FileText } from 'lucide-react'
 import { diagramStore } from '../../stores/DiagramStore'
 import { uiStore } from '../../stores/UIStore'
 import { graphStore } from '../../stores/GraphStore'
@@ -47,30 +47,25 @@ const DiagramsModal = observer(() => {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={e => { if (e.target === e.currentTarget) diagramStore.closeList() }}
-    >
-      <div className="bg-app-surface border border-app-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[80vh]">
+    <div className="fixed inset-0 z-50 bg-app-bg flex flex-col">
+      <div className="flex-1 flex flex-col max-w-2xl w-full mx-auto overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-app-border shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-app-border shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => diagramStore.closeList()} className="text-app-text-3 hover:text-app-text transition-colors p-1 rounded-lg hover:bg-app-elevated">
+              <ArrowLeft size={18} />
+            </button>
             <FolderOpen size={16} className="text-app-accent" />
-            <span className="text-sm font-semibold text-app-text">My Diagrams</span>
+            <span className="text-base font-semibold text-app-text">My Diagrams</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => guardUnsaved(() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) })}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white transition-colors"
-            >
-              <Plus size={12} strokeWidth={2.5} />
-              New
-            </button>
-            <button onClick={() => diagramStore.closeList()} className="text-app-text-3 hover:text-app-text transition-colors">
-              <X size={18} />
-            </button>
-          </div>
+          <button
+            onClick={() => guardUnsaved(() => { diagramStore.newDiagram(); uiStore.setLoadedTemplate(null) })}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-app-accent hover:bg-app-accent-dim text-white transition-colors"
+          >
+            <Plus size={12} strokeWidth={2.5} />
+            New
+          </button>
         </div>
 
         {/* Body */}
