@@ -28,7 +28,7 @@ const UserButton = observer(() => {
     return (
       <button
         onClick={() => authStore.openModal()}
-        className="text-xs px-3 py-1.5 rounded-lg border border-app-border/40 text-app-text-2 hover:text-app-text hover:border-app-border transition-colors"
+        className="text-xs px-3 py-1.5 rounded-lg border border-app-border/40 text-app-text-2 hover:text-app-text hover:border-app-border transition-colors whitespace-nowrap shrink-0"
       >
         Sign in
       </button>
@@ -156,7 +156,7 @@ const Toolbar = observer(() => {
       {/* Save */}
       <button
         onClick={() => authStore.requireAuth(async () => {
-          try { await diagramStore.save() }
+          try { await diagramStore.save(); uiStore.showToast('Diagram saved') }
           catch { uiStore.showToast('Failed to save. Please try again.') }
         })}
         disabled={diagramStore.isSaving || !graphStore.isDirty}

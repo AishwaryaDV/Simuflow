@@ -1,8 +1,9 @@
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { useState, useEffect } from 'react'
-import { Trash2, DollarSign, Info, Zap, X } from 'lucide-react'
+import { Trash2, DollarSign, Info, Zap, X, PanelRightClose } from 'lucide-react'
 import { graphStore } from '../../stores/GraphStore'
+import { uiStore } from '../../stores/UIStore'
 import { validationStore } from '../../stores/ValidationStore'
 import {
   NodeType, LBStrategy, RateLimitAlgorithm, RejectBehavior,
@@ -675,10 +676,16 @@ const ConfigPanel = observer(() => {
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${display.colorClass} border ${display.borderClass}`}>
               <Icon size={16} className={display.textClass} strokeWidth={1.8} />
             </div>
-            <button onClick={() => runInAction(() => graphStore.removeStructuralNode(nodeId))}
-              className="text-app-text-3 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors mt-0.5" title="Delete">
-              <Trash2 size={13} strokeWidth={1.8} />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button onClick={() => uiStore.openConfirm('Delete element', 'Remove this element?', () => runInAction(() => graphStore.removeStructuralNode(nodeId)))}
+                className="text-app-text-3 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors" title="Delete">
+                <Trash2 size={13} strokeWidth={1.8} />
+              </button>
+              <button onClick={() => runInAction(() => graphStore.selectNode(null))}
+                className="text-app-text-3 hover:text-app-text p-1 rounded-lg hover:bg-app-elevated transition-colors" title="Close panel">
+                <PanelRightClose size={13} strokeWidth={1.8} />
+              </button>
+            </div>
           </div>
           <p className="text-sm font-semibold text-app-text mt-2">{display.label}</p>
           <p className="text-[11px] text-app-text-3 mt-0.5">Container — engine ignores this</p>
@@ -739,10 +746,16 @@ const ConfigPanel = observer(() => {
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${display.colorClass} border ${display.borderClass}`}>
             <Icon size={16} className={display.textClass} strokeWidth={1.8} />
           </div>
-          <button onClick={() => runInAction(() => graphStore.removeNode(nodeId!))}
-            className="text-app-text-3 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors mt-0.5" title="Delete node">
-            <Trash2 size={13} strokeWidth={1.8} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => uiStore.openConfirm('Delete node', `Remove "${node.label}" and its edges?`, () => runInAction(() => graphStore.removeNode(nodeId!)))}
+              className="text-app-text-3 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors" title="Delete node">
+              <Trash2 size={13} strokeWidth={1.8} />
+            </button>
+            <button onClick={() => runInAction(() => graphStore.selectNode(null))}
+              className="text-app-text-3 hover:text-app-text p-1 rounded-lg hover:bg-app-elevated transition-colors" title="Close panel">
+              <PanelRightClose size={13} strokeWidth={1.8} />
+            </button>
+          </div>
         </div>
         <p className="text-[10px] font-semibold text-app-text-3 uppercase tracking-widest mt-2">{display.label}</p>
         <p className="text-xs text-app-text-2 mt-0.5 leading-relaxed line-clamp-2">{display.description}</p>

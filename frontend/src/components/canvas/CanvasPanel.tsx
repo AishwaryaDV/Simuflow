@@ -360,7 +360,7 @@ const CanvasPanel = observer(() => {
 
   // ── Mode-driven ReactFlow props ───────────────────────────────────────────
   const panOnDrag      = mode === 'hand'
-  const nodesDraggable = mode === 'select' || mode === 'eraser'
+  const nodesDraggable = mode !== 'hand'
   const cursor         = getCursorForMode(mode)
 
   return (
