@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { observer } from 'mobx-react-lite'
 import { runInAction } from 'mobx'
 import { graphStore } from '../../stores/GraphStore'
@@ -8,12 +9,13 @@ import { uiStore } from '../../stores/UIStore'
 import { authStore } from '../../stores/AuthStore'
 import { diagramStore } from '../../stores/DiagramStore'
 import { SimulationStatus } from '../../types/topology'
-import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2, Link2, Undo2, Redo2 } from 'lucide-react'
+import { LayoutTemplate, Trash2, Play, Pause, Square, ChevronDown, LogOut, Save, FolderOpen, Loader2, Link2, Undo2, Redo2, Settings } from 'lucide-react'
 import ShareModal from '../ui/ShareModal'
 
 const UserButton = observer(() => {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!open) return
@@ -50,6 +52,13 @@ const UserButton = observer(() => {
           <div className="px-3 py-2.5 border-b border-app-border">
             <p className="text-[11px] text-app-text-3 truncate">{authStore.user?.email}</p>
           </div>
+          <button
+            onClick={() => { setOpen(false); navigate('/settings') }}
+            className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-app-text-2 hover:text-app-text hover:bg-app-elevated transition-colors"
+          >
+            <Settings size={13} strokeWidth={1.8} />
+            Settings
+          </button>
           <button
             onClick={async () => { setOpen(false); await authStore.signOut() }}
             className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors"

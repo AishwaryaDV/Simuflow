@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { observer } from 'mobx-react-lite'
 import Toolbar from '../panels/Toolbar'
@@ -21,6 +21,24 @@ import { useLocalStoragePersistence } from '../../hooks/useLocalStoragePersisten
 import { useWorkerBridge } from '../../hooks/useWorkerBridge'
 import { uiStore } from '../../stores/UIStore'
 import { graphStore } from '../../stores/GraphStore'
+
+import { PanelRightOpen } from 'lucide-react'
+import { runInAction } from 'mobx'
+
+const CollapsedRightPanel = observer(function CollapsedRightPanel() {
+  const expand = useCallback(() => runInAction(() => uiStore.toggleRightPanel()), [])
+  return (
+    <aside className="w-10 bg-app-surface border-l border-app-border flex flex-col items-center pt-3 shrink-0">
+      <button
+        onClick={expand}
+        className="p-1.5 rounded-lg text-app-text-3 hover:text-app-text hover:bg-app-elevated transition-colors"
+        title="Expand panel"
+      >
+        <PanelRightOpen size={16} strokeWidth={1.8} />
+      </button>
+    </aside>
+  )
+})
 
 /**
  * 5-zone workspace shell:
@@ -73,7 +91,9 @@ const WorkspaceLayout = observer(function WorkspaceLayout() {
           </div>
           {uiStore.panelState.templates
             ? <TemplatesSidebar />
-            : <ConfigPanel />
+            : !uiStore.rightPanelCollapsed
+              ? <ConfigPanel />
+              : <CollapsedRightPanel />
           }
         </div>
       </div>

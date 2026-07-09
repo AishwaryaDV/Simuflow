@@ -655,12 +655,24 @@ const ConfigPanel = observer(() => {
 
   if (!nodeId || (!simNode && !structuralNode)) {
     return (
-      <aside className="w-64 bg-app-surface border-l border-app-border flex flex-col items-center justify-center text-center p-6 shrink-0">
-        <div className="w-12 h-12 rounded-2xl bg-app-elevated border border-app-border flex items-center justify-center mb-4">
-          <span className="text-app-text-3 text-xl select-none">↖</span>
+      <aside className="w-64 bg-app-surface border-l border-app-border flex flex-col shrink-0">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-app-border shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-app-text-3">Configure</span>
+          <button
+            onClick={() => runInAction(() => uiStore.toggleRightPanel())}
+            className="text-app-text-3 hover:text-app-text p-1 rounded-lg hover:bg-app-elevated transition-colors"
+            title="Collapse panel"
+          >
+            <PanelRightClose size={13} strokeWidth={1.8} />
+          </button>
         </div>
-        <p className="text-sm font-medium text-app-text-2">Select a node</p>
-        <p className="text-xs text-app-text-3 mt-1 leading-relaxed">Click any node on the canvas to configure it</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+          <div className="w-12 h-12 rounded-2xl bg-app-elevated border border-app-border flex items-center justify-center mb-4">
+            <span className="text-app-text-3 text-xl select-none">↖</span>
+          </div>
+          <p className="text-sm font-medium text-app-text-2">Select a node</p>
+          <p className="text-xs text-app-text-3 mt-1 leading-relaxed">Click any node on the canvas to configure it</p>
+        </div>
       </aside>
     )
   }

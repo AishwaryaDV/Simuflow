@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import WorkspaceLayout from './components/layout/WorkspaceLayout'
 import SharedViewPage from './pages/SharedViewPage'
+import SettingsPage from './pages/SettingsPage'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import MobileGate from './components/ui/MobileGate'
 
@@ -12,6 +13,7 @@ function App() {
         <Routes>
           <Route path="/" element={<WorkspaceLayout />} />
           <Route path="/shared/:token" element={<SharedViewPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
